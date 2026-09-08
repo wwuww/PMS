@@ -2,7 +2,9 @@ import { http } from "./http";
 import type {
   Complaint,
   Tenant,
+  TenantUpdate,
   Hotel,
+  HotelUpdate,
   Room,
   RoomType,
   Dashboard,
@@ -135,6 +137,31 @@ export async function createTenant(body: {
   is_chain?: boolean;
 }): Promise<Tenant> {
   const { data } = await http.post<Tenant>("/tenants", body);
+  return data;
+}
+
+// M31：更新租户级设置（如 NoShow 自动扣首晚房费）
+export async function updateTenantSettings(
+  tenantCode: string,
+  body: TenantUpdate
+): Promise<Tenant> {
+  const { data } = await http.patch<Tenant>(
+    `/tenants/${tenantCode}/settings`,
+    body
+  );
+  return data;
+}
+
+// M31：更新门店级设置（noshow_charge_first_night 可置 null=继承租户默认）
+export async function updateHotelSettings(
+  tenantCode: string,
+  hotelId: string,
+  body: HotelUpdate
+): Promise<Hotel> {
+  const { data } = await http.patch<Hotel>(
+    `/tenants/${tenantCode}/hotels/${hotelId}/settings`,
+    body
+  );
   return data;
 }
 

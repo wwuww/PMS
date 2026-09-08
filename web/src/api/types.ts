@@ -4,6 +4,7 @@ export interface Tenant {
   name: string;
   is_chain: boolean;
   status: string;
+  noshow_charge_first_night: boolean; // M31：NoShow 自动扣首晚房费（租户级默认）
 }
 
 export interface Hotel {
@@ -11,6 +12,16 @@ export interface Hotel {
   tenant_id: string;
   code: string;
   name: string;
+  noshow_charge_first_night: boolean | null; // M31：NoShow 自动扣首晚房费（None=继承租户默认）
+}
+
+// M31：租户/门店设置更新（仅写入显式提供的字段；酒店置 null=清除覆盖回落租户默认）
+export interface TenantUpdate {
+  noshow_charge_first_night?: boolean;
+}
+
+export interface HotelUpdate {
+  noshow_charge_first_night?: boolean | null;
 }
 
 export interface RoomType {
