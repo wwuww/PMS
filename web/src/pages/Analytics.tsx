@@ -5,13 +5,20 @@ import {
   Empty,
   Select,
   Spin,
-  Statistic,
   Table,
   Tabs,
   Typography,
   App,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
+import {
+  DollarOutlined,
+  HomeOutlined,
+  LineChartOutlined,
+  RiseOutlined,
+  TeamOutlined,
+} from "@ant-design/icons";
+import StatCard from "../components/StatCard";
 import { useTenant } from "../store/tenant";
 import {
   analyticsDashboard,
@@ -110,40 +117,71 @@ export default function AnalyticsPage() {
 
   if (!hotelId) return <Empty description="该租户下暂未创建门店" />;
 
-  const renderKpi = (d: AnalyticsDashboard) => (
-    <>
-      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 16 }}>
-        <Card style={{ flex: 1, minWidth: 160 }}>
-          <Statistic title="总收入" value={d.total_revenue_cents / 100} precision={2} prefix="¥" />
+  const renderKpi = (d: AnalyticsDashboard) => {
+    const range =
+      d.start_date && d.end_date ? `${d.start_date} ~ ${d.end_date}` : `近 ${d.days} 天`;
+    return (
+      <>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(5, 1fr)",
+            gap: 12,
+            marginBottom: 16,
+          }}
+        >
+          <StatCard
+            label="总营收"
+            value={fmtCents(d.total_revenue_cents)}
+            sub={range}
+            accent="#fa8c16"
+            icon={<DollarOutlined />}
+          />
+          <StatCard
+            label="房费收入"
+            value={fmtCents(d.room_revenue_cents)}
+            sub={range}
+            accent="#1677ff"
+            icon={<HomeOutlined />}
+          />
+          <StatCard
+            label="RevPAR"
+            value={fmtCents(d.revpar_cents)}
+            sub="每可用房收入"
+            accent="#722ed1"
+            icon={<RiseOutlined />}
+          />
+          <StatCard
+            label="ADR"
+            value={fmtCents(d.adr_cents)}
+            sub="已售均价"
+            accent="#13c2c2"
+            icon={<LineChartOutlined />}
+          />
+          <StatCard
+            label="出租率"
+            value={fmtBps(d.occ_pct_bps)}
+            sub={`已售 ${fmtInt(d.occupied_room_nights)} 房晚`}
+            accent="#389e0d"
+            icon={<TeamOutlined />}
+          />
+        </div>
+        <Descriptions bordered column={3} size="small" style={{ marginBottom: 16 }}>
+          <Descriptions.Item label="门店">{d.hotel_name}</Descriptions.Item>
+          <Descriptions.Item label="统计区间">
+            {d.start_date || "?"} ~ {d.end_date || "?"}
+          </Descriptions.Item>
+          <Descriptions.Item label="天数">{d.days}</Descriptions.Item>
+          <Descriptions.Item label="总房数">{fmtInt(d.total_rooms)}</Descriptions.Item>
+          <Descriptions.Item label="已售房晚">{fmtInt(d.occupied_room_nights)}</Descriptions.Item>
+          <Descriptions.Item label="其他收入">{fmtCents(d.other_revenue_cents)}</Descriptions.Item>
+        </Descriptions>
+        <Card title="日序列（收入 / 出租率）" size="small">
+          <DailyTrend series={d.daily_series} />
         </Card>
-        <Card style={{ flex: 1, minWidth: 160 }}>
-          <Statistic title="房费收入" value={d.room_revenue_cents / 100} precision={2} prefix="¥" />
-        </Card>
-        <Card style={{ flex: 1, minWidth: 160 }}>
-          <Statistic title="RevPAR" value={d.revpar_cents / 100} precision={2} prefix="¥" />
-        </Card>
-        <Card style={{ flex: 1, minWidth: 160 }}>
-          <Statistic title="ADR" value={d.adr_cents / 100} precision={2} prefix="¥" />
-        </Card>
-        <Card style={{ flex: 1, minWidth: 160 }}>
-          <Statistic title="出租率" value={fmtBps(d.occ_pct_bps)} />
-        </Card>
-      </div>
-      <Descriptions bordered column={3} size="small" style={{ marginBottom: 16 }}>
-        <Descriptions.Item label="门店">{d.hotel_name}</Descriptions.Item>
-        <Descriptions.Item label="统计区间">
-          {d.start_date || "?"} ~ {d.end_date || "?"}
-        </Descriptions.Item>
-        <Descriptions.Item label="天数">{d.days}</Descriptions.Item>
-        <Descriptions.Item label="总房数">{fmtInt(d.total_rooms)}</Descriptions.Item>
-        <Descriptions.Item label="已售房晚">{fmtInt(d.occupied_room_nights)}</Descriptions.Item>
-        <Descriptions.Item label="其他收入">{fmtCents(d.other_revenue_cents)}</Descriptions.Item>
-      </Descriptions>
-      <Card title="日序列（收入 / 出租率）" size="small">
-        <DailyTrend series={d.daily_series} />
-      </Card>
-    </>
-  );
+      </>
+    );
+  };
 
   const items = [
     {
