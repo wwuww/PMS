@@ -119,6 +119,8 @@ import type {
   DepositVoidIn,
   AutoReleaseIn,
   AutoReleaseOut,
+  OtaConfig,
+  OtaConfigIn,
   ChannelRoomMapping,
   ChannelRoomMappingIn,
   ChannelRatePlan,

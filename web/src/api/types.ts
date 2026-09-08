@@ -1132,6 +1132,13 @@ export interface ChannelResult {
   integrated: boolean;
   message: string;
   payload: Record<string, unknown>;
+  // M29 OTA 推送回执：后端 ota_service.push_inventory / push_rates 实际返回
+  items?: unknown[]; // 推送明细（房量 / 渠道价）
+  accepted?: boolean; // 是否被渠道接受
+  trace_id?: string; // 链路追踪 ID
+  hotel_id?: number | null;
+  dry_run?: boolean;
+  total_rooms?: number; // 仅 inventory push 返回
 }
 
 export type ReportType =

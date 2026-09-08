@@ -119,7 +119,11 @@ export default function DepositDetailDrawer({ open, depositId, onClose }: Props)
                     <div>
                       <Text strong>{ACTION_LABELS[t.action] ?? t.action}</Text>{" "}
                       <Text>{fmtCents(t.amount_cents)}</Text>{" "}
-                      {t.method && <Tag>{METHOD_LABELS[t.method] ?? t.method}</Tag>}
+                      {t.method && (
+                        <Tag>
+                          {(METHOD_LABELS as Record<string, string>)[t.method] ?? t.method}
+                        </Tag>
+                      )}
                     </div>
                     <Text type="secondary" style={{ fontSize: 12 }}>
                       {t.operator} · {t.created_at}
