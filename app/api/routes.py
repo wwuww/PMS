@@ -9,7 +9,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Security, status
 from fastapi.responses import Response, StreamingResponse
 from fastapi.security import SecurityScopes
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from app.core.config import get_settings
 from app.models.rbac import LoginSession, User
@@ -206,6 +206,8 @@ from app.api.schemas import (
     ShiftOut,
     PsbTaskIn,
     PsbTaskOut,
+    SearchResultItem,
+    SearchResultOut,
     TenantCreate,
     TenantOut,
     TenantUpdate,
@@ -5333,3 +5335,303 @@ async def deposit_list_by_booking(
     svc = DepositService(session)
     rows = await svc.list(tenant_id=tenant_id, booking_id=booking_id, limit=200)
     return [_deposit_to_out(d) for d in rows]
+
+
+# ---------- M34d 全局搜索 ----------
+
+
+# 实体状态 → antd Tag color 映射（徽章着色）
+_STATUS_COLOR = {
+    # Booking
+    "created": "blue",
+    "checked_in": "green",
+    "checked_out": "default",
+    "cancelled": "red",
+    "noshow": "red",
+    # Bill
+    "OPEN": "blue",
+    "SETTLED": "green",
+    # Room state（M1）
+    "vacant_clean": "green",
+    "vacant_dirty": "orange",
+    "occupied_clean": "blue",
+    "occupied_dirty": "red",
+    "out_of_order": "red",
+    "inspected": "cyan",
+    # Member level
+    "NORMAL": "default",
+    "SILVER": "blue",
+    "GOLD": "gold",
+    "PLATINUM": "purple",
+    # Group block
+    "draft": "default",
+    "active": "green",
+    "closed": "default",
+    # Notification
+    "critical": "red",
+    "normal": "blue",
+    "info": "default",
+}
+
+
+def _status_color(status: str | None) -> str | None:
+    """统一状态→颜色 helper：未知状态返回 None（前端走 default 灰）。"""
+    if not status:
+        return None
+    return _STATUS_COLOR.get(status.lower())
+
+
+@router.get("/tenants/{tenant_id}/search", response_model=SearchResultOut)
+async def search_global(
+    tenant_id: str,
+    q: str = Query(..., min_length=1, max_length=64, description="搜索关键词"),
+    types: str | None = Query(
+        None, description="逗号分隔的实体类型过滤（guest,booking,room,bill,member,group,notification）"
+    ),
+    limit: int = Query(20, ge=1, le=50, description="单类型上限（防止大查询拖垮）"),
+    login_session: LoginSession = Depends(require_auth),
+    session: AsyncSession = Depends(get_session),
+) -> SearchResultOut:
+    """M34d 全局搜索：跨 7 实体聚合查询（Guest / Booking / Room / Bill / Member / Group / Notification）。
+
+    实现要点：
+    - 每个实体类最多 limit 条；items 是所有类型的并集，total = len(items)。
+    - by_type 字段统计各类型命中数（如 {"guest": 3, "booking": 2}），前端按 by_type 排序展示。
+    - 单实体查询 try/except 隔离：失败时仅跳过该实体，不影响其他实体的结果（默认空值 0）。
+    - 权限：与既有单实体搜索端点一致（依赖 require_auth 全局鉴权 + tenant_id 路径参数隔离）。
+    - types 支持逗号分隔字符串（如 "guest,booking"），未传则聚合 7 实体。
+    """
+    q_strip = q.strip()
+    if not q_strip:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "搜索关键词不能为空")
+
+    type_filter: set[str] | None = None
+    if types:
+        type_filter = {t.strip().lower() for t in types.split(",") if t.strip()}
+
+    items: list[SearchResultItem] = []
+    by_type: dict[str, int] = {}
+
+    # 1) Guest —— 模糊搜索（姓名 LIKE / 手机号 LIKE）
+    if not type_filter or "guest" in type_filter:
+        try:
+            like = f"%{q_strip}%"
+            stmt = (
+                select(Guest)
+                .where(
+                    Guest.tenant_id == tenant_id,
+                    or_(Guest.name.ilike(like), Guest.phone.ilike(like), Guest.id_no.ilike(like)),
+                )
+                .order_by(Guest.id.desc())
+                .limit(limit)
+            )
+            result = await session.execute(stmt)
+            guests = list(result.scalars().all())
+            for g in guests:
+                items.append(
+                    SearchResultItem(
+                        type="guest",
+                        id=g.id,
+                        title=g.name or "—",
+                        subtitle=g.phone or g.id_no or "—",
+                        href=f"/guests/{g.id}",
+                    )
+                )
+            by_type["guest"] = len(guests)
+        except Exception:
+            by_type["guest"] = 0
+
+    # 2) Booking —— 按 guest_name / guest_phone 模糊匹配（无 booking_no 字段）
+    if not type_filter or "booking" in type_filter:
+        try:
+            like = f"%{q_strip}%"
+            stmt = (
+                select(Booking)
+                .where(
+                    Booking.tenant_id == tenant_id,
+                    or_(
+                        Booking.guest_name.ilike(like),
+                        Booking.guest_phone.ilike(like),
+                        Booking.room_no.ilike(like),
+                        Booking.id_doc_no.ilike(like),
+                    ),
+                )
+                .order_by(Booking.id.desc())
+                .limit(limit)
+            )
+            result = await session.execute(stmt)
+            bookings = list(result.scalars().all())
+            for b in bookings:
+                items.append(
+                    SearchResultItem(
+                        type="booking",
+                        id=b.id,
+                        title=f"订单 #{b.id} · {b.guest_name or '—'}",
+                        subtitle=f"{b.check_in_date} ~ {b.check_out_date} · 房号 {b.room_no or '—'}",
+                        href=f"/bookings?id={b.id}",
+                        badge=b.status,
+                        badge_color=_status_color(b.status),
+                    )
+                )
+            by_type["booking"] = len(bookings)
+        except Exception:
+            by_type["booking"] = 0
+
+    # 3) Room —— 按 room_no 模糊 + 房型 code
+    if not type_filter or "room" in type_filter:
+        try:
+            like = f"%{q_strip}%"
+            stmt = (
+                select(Room, RoomType.code)
+                .outerjoin(RoomType, Room.room_type_id == RoomType.id)
+                .where(
+                    Room.tenant_id == tenant_id,
+                    or_(Room.room_no.ilike(like), RoomType.code.ilike(like)),
+                )
+                .order_by(Room.room_no.asc())
+                .limit(limit)
+            )
+            result = await session.execute(stmt)
+            rows = result.all()
+            for r, rt_code in rows:
+                items.append(
+                    SearchResultItem(
+                        type="room",
+                        id=r.id,
+                        title=f"房号 {r.room_no}",
+                        subtitle=f"{rt_code or '—'} · {r.state}",
+                        href=f"/rooms?focus={r.id}",
+                        badge=r.state,
+                        badge_color=_status_color(r.state),
+                    )
+                )
+            by_type["room"] = len(rows)
+        except Exception:
+            by_type["room"] = 0
+
+    # 4) Bill —— 按 bill_no / guest_name 模糊
+    if not type_filter or "bill" in type_filter:
+        try:
+            like = f"%{q_strip}%"
+            stmt = (
+                select(Bill)
+                .where(
+                    Bill.tenant_id == tenant_id,
+                    or_(Bill.bill_no.ilike(like), Bill.guest_name.ilike(like), Bill.room_no.ilike(like)),
+                )
+                .order_by(Bill.id.desc())
+                .limit(limit)
+            )
+            result = await session.execute(stmt)
+            bills = list(result.scalars().all())
+            for b in bills:
+                balance_yuan = (b.balance or 0) / 100
+                items.append(
+                    SearchResultItem(
+                        type="bill",
+                        id=b.id,
+                        title=f"账单 {b.bill_no}",
+                        subtitle=f"{b.guest_name or '—'} · 房号 {b.room_no or '—'} · 余额 ¥{balance_yuan:.2f}",
+                        href=f"/billing?id={b.id}",
+                        badge=b.status,
+                        badge_color=_status_color(b.status),
+                    )
+                )
+            by_type["bill"] = len(bills)
+        except Exception:
+            by_type["bill"] = 0
+
+    # 5) Member —— 按 phone / name 模糊匹配
+    if not type_filter or "member" in type_filter:
+        try:
+            like = f"%{q_strip}%"
+            stmt = (
+                select(Member)
+                .where(
+                    Member.tenant_id == tenant_id,
+                    or_(Member.phone.ilike(like), Member.name.ilike(like)),
+                )
+                .order_by(Member.id.desc())
+                .limit(limit)
+            )
+            result = await session.execute(stmt)
+            members = list(result.scalars().all())
+            for m in members:
+                items.append(
+                    SearchResultItem(
+                        type="member",
+                        id=m.id,
+                        title=m.name or "—",
+                        subtitle=f"{m.phone} · {m.level}",
+                        href=f"/members?id={m.id}",
+                        badge=m.level,
+                        badge_color=_status_color(m.level),
+                    )
+                )
+            by_type["member"] = len(members)
+        except Exception:
+            by_type["member"] = 0
+
+    # 6) Group —— 按 name / notes 模糊匹配
+    if not type_filter or "group" in type_filter:
+        try:
+            like = f"%{q_strip}%"
+            stmt = (
+                select(GroupBlock)
+                .where(
+                    GroupBlock.tenant_id == tenant_id,
+                    or_(GroupBlock.name.ilike(like), GroupBlock.notes.ilike(like)),
+                )
+                .order_by(GroupBlock.id.desc())
+                .limit(limit)
+            )
+            result = await session.execute(stmt)
+            groups = list(result.scalars().all())
+            for g in groups:
+                items.append(
+                    SearchResultItem(
+                        type="group",
+                        id=g.id,
+                        title=g.name,
+                        subtitle=f"{g.arrival_date} ~ {g.departure_date}",
+                        href=f"/group-blocks?id={g.id}",
+                        badge=g.status,
+                        badge_color=_status_color(g.status),
+                    )
+                )
+            by_type["group"] = len(groups)
+        except Exception:
+            by_type["group"] = 0
+
+    # 7) Notification —— 按 title / body 模糊匹配
+    if not type_filter or "notification" in type_filter:
+        try:
+            like = f"%{q_strip}%"
+            stmt = (
+                select(Notification)
+                .where(
+                    Notification.tenant_id == tenant_id,
+                    or_(Notification.title.ilike(like), Notification.body.ilike(like)),
+                )
+                .order_by(Notification.id.desc())
+                .limit(limit)
+            )
+            result = await session.execute(stmt)
+            notifs = list(result.scalars().all())
+            for n in notifs:
+                items.append(
+                    SearchResultItem(
+                        type="notification",
+                        id=n.id,
+                        title=n.title,
+                        subtitle=n.body or "—",
+                        href=n.link or f"/notifications?id={n.id}",
+                        badge="已读" if n.read_at else "未读",
+                        badge_color="default" if n.read_at else "blue",
+                    )
+                )
+            by_type["notification"] = len(notifs)
+        except Exception:
+            by_type["notification"] = 0
+
+    return SearchResultOut(items=items, total=len(items), by_type=by_type, query=q_strip)

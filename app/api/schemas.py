@@ -2188,3 +2188,27 @@ class AutoReleaseIn(BaseModel):
 class AutoReleaseOut(BaseModel):
     released: int
     ids: list[int]
+
+
+# ---------- M34d 全局搜索 ----------
+
+
+class SearchResultItem(BaseModel):
+    """M34d 全局搜索单条结果：跨 7 实体的统一结果条目。"""
+
+    type: str  # guest / booking / room / bill / member / group / notification
+    id: int | str  # 实体主键（int 主键为主，notification 也是 BigInt）
+    title: str  # 主标（宾客姓名 / 订单号 / 房号 / 账单号 / 会员姓名 / 团队名 / 通知标题）
+    subtitle: str  # 副标（手机号 / 入住日期 / 房型 / 金额 / 会员等级 / 入住人 / 通知摘要）
+    href: str  # 前端跳转路径
+    badge: str | None = None  # 状态徽章文本
+    badge_color: str | None = None  # 徽章颜色（antd Tag color：red/green/blue/...）
+
+
+class SearchResultOut(BaseModel):
+    """M34d 全局搜索响应：聚合跨实体结果 + 各类型命中计数。"""
+
+    items: list[SearchResultItem]
+    total: int
+    by_type: dict[str, int]  # {"guest": 3, "booking": 2, ...} 各类型命中数
+    query: str
