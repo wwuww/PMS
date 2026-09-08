@@ -55,6 +55,7 @@ import {
   ALLOWED_TRIGGERS,
   type RoomTrigger,
 } from "../domain/roomActions";
+import "./RoomStatus.css"; // M34b：房态盘专属样式（hover 浮起 + 卡间呼吸 12px）
 
 const STATE_META: Record<RoomState, { color: string; bg: string }> = {
   vacant_clean: { color: "#389e0d", bg: "#f6ffed" },
@@ -704,6 +705,7 @@ export default function RoomStatusPage() {
     return (
       <div
         key={r.id}
+        className="room-card"
         onClick={(e) => {
           // M32.17d：Ctrl/⌘ + 左键 = 多选（自动进入批量条，再点一次取消选择）
           if (e.ctrlKey || e.metaKey) {
@@ -735,18 +737,10 @@ export default function RoomStatusPage() {
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
-          transition: "transform .12s, box-shadow .12s",
+          // M34b：transition / hover 浮起 / 阴影增强由 RoomStatus.css 接管
           position: "relative",
           outline: batchSelected ? "3px solid #1677ff" : undefined,
           outlineOffset: 1,
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.transform = "translateY(-2px)";
-          e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,.25)";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.transform = "none";
-          e.currentTarget.style.boxShadow = "none";
         }}
         title={
           (isVacant(r.state)
@@ -889,7 +883,13 @@ export default function RoomStatusPage() {
   return (
     <div style={{ display: "flex", gap: 12, alignItems: "flex-start", paddingBottom: 52 }}>
       {/* 左侧：房态过滤面板（参考维也纳 PMS 5.0 左栏，带计数可点选） */}
-      <Card size="small" title="房态" style={{ width: 196, flexShrink: 0 }} styles={{ body: { padding: "8px 8px" } }}>
+      <Card
+        size="small"
+        title="房态"
+        className="state-filter"
+        style={{ width: 196, flexShrink: 0 }}
+        styles={{ body: { padding: "8px 8px" } }}
+      >
         {([
           ...(Object.entries(ROOM_STATE_LABELS) as [RoomState, string][]).map(([st, label]) => ({
             key: st,
@@ -905,6 +905,7 @@ export default function RoomStatusPage() {
           return (
             <div
               key={it.key}
+              className={`filter-chip${sel ? " is-active" : ""}`}
               onClick={() => setStateFilter(sel ? null : it.key)}
               style={{
                 display: "flex",
@@ -982,14 +983,12 @@ export default function RoomStatusPage() {
         {viewMode === "floor" ? (
           floors.map((floor) => (
             <Card key={floor} size="small" style={{ marginBottom: 10 }} title={`${floor} 层`}>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {visibleRooms.filter((r) => r.floor === floor).map(renderCard)}
-              </div>
+              <div className="room-grid">{visibleRooms.filter((r) => r.floor === floor).map(renderCard)}</div>
             </Card>
           ))
         ) : (
           <Card size="small" loading={loading && rooms.length === 0}>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>{visibleRooms.map(renderCard)}</div>
+            <div className="room-grid">{visibleRooms.map(renderCard)}</div>
           </Card>
         )}
 
@@ -1044,6 +1043,7 @@ export default function RoomStatusPage() {
 
         {/* 经营统计条：fixed 钉在屏幕底部（避开左侧 208px 导航栏），与房间多少/滚动无关 */}
         <div
+          className="room-stat-bar"
           style={{
             padding: "8px 16px",
             background: "#fffbe6",
@@ -1061,34 +1061,34 @@ export default function RoomStatusPage() {
           }}
         >
           <span>经营统计：</span>
-          <span>
+          <span className="stat-chip">
             总数 <b>{rooms.length}</b>
           </span>
-          <span>
+          <span className="stat-chip is-primary">
             在住 <b>{occupiedCount}</b>
           </span>
-          <span>
+          <span className="stat-chip">
             空净 <b>{counts.vacant_clean || 0}</b>
           </span>
-          <span>
+          <span className="stat-chip">
             空脏 <b>{counts.vacant_dirty || 0}</b>
           </span>
-          <span>
+          <span className="stat-chip">
             锁房 <b>{counts.arrival_locked || 0}</b>
           </span>
-          <span>
+          <span className="stat-chip">
             维修 <b>{counts.maintenance || 0}</b>
           </span>
-          <span>
+          <span className="stat-chip">
             停用 <b>{counts.out_of_service || 0}</b>
           </span>
-          <span>
+          <span className="stat-chip">
             免打扰 <b>{dndCount}</b>
           </span>
-          <span>
+          <span className="stat-chip">
             平均房价 <b>¥{(avgPrice / 100).toFixed(2)}</b>
           </span>
-          <span>
+          <span className="stat-chip is-primary">
             出租率 <b>{occRate}%</b>
           </span>
         </div>

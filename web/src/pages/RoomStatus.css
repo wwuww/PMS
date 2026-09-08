@@ -1,0 +1,68 @@
+/* ============================================================
+   RoomStatus 房态盘专属样式（M34b 升级）
+   - 房间卡 hover 浮起（沿用 StatCard 风格：阴影 + translateY(-2px)）
+   - 卡间呼吸 6px → 12px
+   - 状态筛选 chip 视觉强化
+   - 经营统计条 chip 样式统一（与 StatCard 视觉语言对齐）
+   注意事项：
+   - 房间卡为实色底（STATE_META 注入 background: <color>），本样式不覆盖背景色，
+     只补 transition / hover 浮起 / 阴影增强，与白底 StatCard 的浮动风格保持一致
+   ============================================================ */
+
+/* ---------- 房间卡：hover 浮起 ---------- */
+.room-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease, outline-color 0.18s ease;
+  will-change: transform;
+}
+.room-card:hover {
+  transform: translateY(-2px);
+  /* 实色底投影略加深一点（比白底 StatCard 略重），保证视觉清晰 */
+  box-shadow: 0 6px 16px rgba(31, 35, 41, 0.22);
+  z-index: 2;
+}
+.room-card:active {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(31, 35, 41, 0.16);
+}
+
+/* ---------- 房间网格：卡间呼吸 6px → 12px ---------- */
+/* 注：原实现用 flex-wrap 而非 grid，因房卡宽度固定 112px，
+   流式布局对不等高剩余房间更友好（最后一行不会留大空隙） */
+.room-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+/* ---------- 状态筛选 chip：选中态视觉强化（左侧「房态」面板） ---------- */
+.state-filter .filter-chip {
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.state-filter .filter-chip:hover {
+  background: #f0f5ff;
+  border-color: #adc6ff !important;
+}
+.state-filter .filter-chip.is-active {
+  font-weight: 600;
+}
+
+/* ---------- 经营统计条：底部 fixed chip 样式（与 StatCard 视觉语言统一） ---------- */
+.room-stat-bar .stat-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.7);
+}
+.room-stat-bar .stat-chip b {
+  color: #d48806;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.room-stat-bar .stat-chip.is-primary {
+  background: #fff7e6;
+}
+.room-stat-bar .stat-chip.is-primary b {
+  color: #d43806;
+}
