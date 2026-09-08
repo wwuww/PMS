@@ -1,6 +1,10 @@
 import { useState } from "react";
 import { Button, Card, Form, Input, Typography, message } from "antd";
-import { LockOutlined, UserOutlined } from "@ant-design/icons";
+import {
+  LockOutlined,
+  UserOutlined,
+  SafetyCertificateOutlined,
+} from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { useTenant } from "../store/tenant";
 import { login } from "../api/endpoints";
@@ -52,16 +56,86 @@ export default function Login() {
         minHeight: "100vh",
         display: "grid",
         placeItems: "center",
-        background: "linear-gradient(135deg,#1f2a44,#3a4a6b)",
+        background:
+          "linear-gradient(135deg, #1e3a8a 0%, #2563eb 50%, #1e40af 100%)",
+        position: "relative",
+        overflow: "hidden",
       }}
     >
-      <Card style={{ width: 360 }} bordered>
-        <div style={{ textAlign: "center", marginBottom: 20 }}>
-          <Title level={3} style={{ marginBottom: 4 }}>
+      {/* 背景装饰圆：右上 */}
+      <div
+        style={{
+          position: "absolute",
+          top: "-10%",
+          right: "-5%",
+          width: 400,
+          height: 400,
+          borderRadius: "50%",
+          background:
+            "radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%)",
+          pointerEvents: "none",
+        }}
+      />
+      {/* 背景装饰圆：左下 */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: "-15%",
+          left: "-8%",
+          width: 500,
+          height: 500,
+          borderRadius: "50%",
+          background:
+            "radial-gradient(circle, rgba(125,211,252,0.10) 0%, transparent 70%)",
+          pointerEvents: "none",
+        }}
+      />
+
+      <Card
+        style={{
+          width: 400,
+          borderRadius: 16,
+          boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+          position: "relative",
+          zIndex: 1,
+        }}
+        bordered={false}
+      >
+        {/* 品牌区：渐变方块 logo + 主标 + 副标 */}
+        <div style={{ textAlign: "center", marginBottom: 28, paddingTop: 8 }}>
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: 56,
+              height: 56,
+              borderRadius: 14,
+              background:
+                "linear-gradient(135deg, #1677ff 0%, #69b1ff 100%)",
+              boxShadow: "0 8px 20px rgba(22,119,255,0.4)",
+              marginBottom: 16,
+            }}
+          >
+            <SafetyCertificateOutlined style={{ fontSize: 28, color: "#fff" }} />
+          </div>
+          <Title
+            level={3}
+            style={{
+              margin: 0,
+              marginBottom: 6,
+              fontWeight: 700,
+              letterSpacing: 0.5,
+            }}
+          >
             PMS Cloud
           </Title>
-          <Text type="secondary">酒店集团经营中台 · 登录</Text>
+          <Text type="secondary" style={{ fontSize: 13 }}>
+            酒店集团经营中台 · 多门店多渠道一体化
+          </Text>
         </div>
+
+        {/* 表单（保持原 onFinish 逻辑） */}
         <Form form={form} layout="vertical" onFinish={onFinish}>
           <Form.Item
             name="username"
@@ -83,9 +157,20 @@ export default function Login() {
             登录
           </Button>
         </Form>
-        <div style={{ marginTop: 12, textAlign: "center" }}>
+
+        {/* 底部：分割线 + 当前租户 + 默认账号 */}
+        <div
+          style={{
+            marginTop: 16,
+            paddingTop: 12,
+            borderTop: "1px solid #f0f2f5",
+            textAlign: "center",
+          }}
+        >
           <Text type="secondary" style={{ fontSize: 12 }}>
-            当前租户：{tenantCode}（后端已强制会话鉴权，默认账号 admin / admin123）
+            当前租户：<Text code style={{ fontSize: 11 }}>{tenantCode}</Text>
+            <br />
+            默认账号 admin / admin123
           </Text>
         </div>
       </Card>

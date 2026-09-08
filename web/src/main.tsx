@@ -15,12 +15,14 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       theme={{
         token: {
           colorPrimary: "#1677ff",
-          borderRadius: 10,
+          borderRadius: 12,
           colorBgLayout: "#f5f7fa",
           colorText: "#1f2329",
           colorTextSecondary: "#646a73",
           colorBorderSecondary: "#eef0f4",
           fontSize: 14,
+          boxShadow: "0 1px 3px rgba(31,35,41,0.06), 0 1px 2px rgba(31,35,41,0.04)",
+          boxShadowSecondary: "0 4px 12px rgba(31,35,41,0.08)",
           boxShadowTertiary: "0 2px 8px rgba(31,35,41,.06)",
           fontFamily:
             "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif",
