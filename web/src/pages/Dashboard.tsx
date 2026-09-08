@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import {
   Card,
   Col,
   Row,
-  Statistic,
   Table,
   Tag,
   Empty,
@@ -14,12 +14,60 @@ import {
   Typography,
   Descriptions,
 } from "antd";
-import GlassStatCard from "../components/GlassStatCard";
+import {
+  AreaChartOutlined,
+  TeamOutlined,
+  LoginOutlined,
+  LogoutOutlined,
+  CheckCircleOutlined,
+  CalendarOutlined,
+} from "@ant-design/icons";
 import dayjs from "dayjs";
 import { managerDashboard, runNightAudit, nightAuditBoard } from "../api/endpoints";
 import type { Dashboard, Booking, NightAuditBoard } from "../api/types";
 import { useTenant } from "../store/tenant";
 import { fmtCents } from "../utils/format";
+import "./Dashboard.css";
+
+/**
+ * 数据卡（M33 升级版）
+ * - 顶部 3px 渐变色条（驱动色 = --stat-accent）
+ * - 28px 灰底图标 + accent 描边色
+ * - 数字 30px tabular-nums + 悬停浮起
+ */
+export function StatCard({
+  label,
+  value,
+  suffix,
+  sub,
+  accent,
+  icon,
+}: {
+  label: string;
+  value: ReactNode;
+  suffix?: string;
+  sub?: string;
+  accent: string;
+  icon?: ReactNode;
+}) {
+  return (
+    <div
+      className="stat-card"
+      style={{ "--stat-accent": accent } as CSSProperties}
+    >
+      <span className="stat-card-bar" />
+      <div className="stat-card-top">
+        <span className="stat-card-icon">{icon}</span>
+        <span className="stat-card-label">{label}</span>
+      </div>
+      <div className="stat-card-value">
+        {value}
+        {suffix && <span className="stat-card-suffix">{suffix}</span>}
+      </div>
+      {sub && <div className="stat-card-sub">{sub}</div>}
+    </div>
+  );
+}
 
 export default function DashboardPage() {
   const { tenantCode, hotelId } = useTenant();
@@ -95,27 +143,71 @@ export default function DashboardPage() {
         style={{
           display: "flex",
           justifyContent: "space-between",
-          alignItems: "center",
+          alignItems: "flex-end",
+          marginBottom: 20,
+        }}
+      >
+        <div>
+          <Typography.Title level={4} style={{ margin: 0, marginBottom: 4 }}>
+            经营概览
+          </Typography.Title>
+          <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+            实时数据 · 营业日报视图
+          </Typography.Text>
+        </div>
+        <Button type="primary" onClick={() => setAuditOpen(true)}>
+          运行夜审
+        </Button>
+      </div>
+
+      {/* 数据卡 6 列网格（M33：自建 StatCard + 渐变色条） */}
+      <div
+        className="dashboard-stat-grid"
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(6, 1fr)",
+          gap: 14,
           marginBottom: 16,
         }}
       >
-        <Typography.Title level={4} style={{ margin: 0 }}>
-          经营概览
-        </Typography.Title>
-        <Button onClick={() => setAuditOpen(true)}>运行夜审</Button>
-      </div>
-
-      {/* 玻璃拟态指标带 */}
-      <div
-        className="glass-band"
-        style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 12, marginBottom: 16 }}
-      >
-        <GlassStatCard label="出租率" value={data.occupancy_pct} suffix="%" accent="#1677ff" />
-        <GlassStatCard label="在住房间" value={data.in_house} sub={`总房数 ${data.rooms.total}`} accent="#13c2c2" />
-        <GlassStatCard label="今日预抵" value={data.arrivals.length} accent="#fa8c16" />
-        <GlassStatCard label="今日预离" value={data.departures.length} accent="#2f54eb" />
-        <GlassStatCard label="空净可售" value={data.rooms.by_state.vacant_clean ?? "-"} accent="#389e0d" />
-        <GlassStatCard label="营业日期" value={data.business_date} accent="#722ed1" />
+        <StatCard
+          label="出租率"
+          value={data.occupancy_pct}
+          suffix="%"
+          accent="#1677ff"
+          icon={<AreaChartOutlined />}
+        />
+        <StatCard
+          label="在住房间"
+          value={data.in_house}
+          sub={`总房数 ${data.rooms.total}`}
+          accent="#13c2c2"
+          icon={<TeamOutlined />}
+        />
+        <StatCard
+          label="今日预抵"
+          value={data.arrivals.length}
+          accent="#fa8c16"
+          icon={<LoginOutlined />}
+        />
+        <StatCard
+          label="今日预离"
+          value={data.departures.length}
+          accent="#2f54eb"
+          icon={<LogoutOutlined />}
+        />
+        <StatCard
+          label="空净可售"
+          value={data.rooms.by_state.vacant_clean ?? "-"}
+          accent="#389e0d"
+          icon={<CheckCircleOutlined />}
+        />
+        <StatCard
+          label="营业日期"
+          value={data.business_date}
+          accent="#722ed1"
+          icon={<CalendarOutlined />}
+        />
       </div>
 
       <Row gutter={16} style={{ marginTop: 16 }}>
@@ -123,9 +215,11 @@ export default function DashboardPage() {
           <Card title="预抵（Arrivals）" loading={loading}>
             {data.arrivals.length ? (
               <Table
+                className="dashboard-table"
                 rowKey="id"
                 size="small"
                 pagination={false}
+                scroll={{ x: 600 }}
                 columns={bookingCols}
                 dataSource={data.arrivals as Booking[]}
               />
@@ -138,9 +232,11 @@ export default function DashboardPage() {
           <Card title="预离（Departures）" loading={loading}>
             {data.departures.length ? (
               <Table
+                className="dashboard-table"
                 rowKey="id"
                 size="small"
                 pagination={false}
+                scroll={{ x: 600 }}
                 columns={bookingCols}
                 dataSource={data.departures as Booking[]}
               />
@@ -165,9 +261,11 @@ export default function DashboardPage() {
           }
         >
           <Table
+            className="dashboard-table"
             rowKey="hotel_id"
             size="small"
             pagination={false}
+            scroll={{ x: 720 }}
             dataSource={board.hotels}
             onRow={(record) => ({
               style: record.suspended_count > 0 ? { background: "#fff1f0" } : undefined,

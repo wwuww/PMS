@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Badge, Button, Dropdown, Layout, Menu, Select, Spin, Tabs, Tag, Typography } from "antd";
+import { Badge, Button, Dropdown, Input, Layout, Menu, Select, Spin, Tabs, Tag, Typography } from "antd";
 import type { MenuProps } from "antd";
 import {
   DashboardOutlined,
@@ -37,6 +37,7 @@ import {
   ControlOutlined,
   CloudUploadOutlined,
   FileTextOutlined,
+  SearchOutlined,
 } from "@ant-design/icons";
 import { useLocation, useNavigate, useRoutes } from "react-router-dom";
 import { layoutRoutes } from "../App";
@@ -373,15 +374,51 @@ export default function AppLayout() {
         <div
           style={{
             color: "#fff",
-            fontSize: 18,
-            fontWeight: 700,
-            padding: "16px 16px",
-            letterSpacing: 1,
+            padding: "18px 16px 16px",
             borderBottom: "1px solid rgba(255,255,255,.08)",
-            marginBottom: 8,
+            marginBottom: 4,
           }}
         >
-          PMS Cloud
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div
+              style={{
+                width: 30,
+                height: 30,
+                borderRadius: 8,
+                background: "linear-gradient(135deg, #1677ff 0%, #69b1ff 100%)",
+                display: "grid",
+                placeItems: "center",
+                fontWeight: 700,
+                fontSize: 14,
+                color: "#fff",
+                boxShadow: "0 2px 8px rgba(22,119,255,.5)",
+              }}
+            >
+              P
+            </div>
+            <div>
+              <div
+                style={{
+                  fontSize: 15,
+                  fontWeight: 700,
+                  letterSpacing: 0.5,
+                  lineHeight: 1.2,
+                }}
+              >
+                PMS Cloud
+              </div>
+              <div
+                style={{
+                  fontSize: 10.5,
+                  color: "rgba(255,255,255,.55)",
+                  letterSpacing: 0.4,
+                  marginTop: 2,
+                }}
+              >
+                酒店集团经营中台
+              </div>
+            </div>
+          </div>
         </div>
         <Menu
           theme="dark"
@@ -398,11 +435,12 @@ export default function AppLayout() {
         <Header
           style={{
             background: "#fff",
-            padding: "0 24px",
+            padding: "0 20px",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
             boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+            borderBottom: "1px solid #eef0f4",
           }}
         >
           <Typography.Title
@@ -411,6 +449,16 @@ export default function AppLayout() {
           >
             酒店管理系统
           </Typography.Title>
+          <Input
+            placeholder="搜索菜单、订单、宾客…"
+            prefix={<SearchOutlined style={{ color: "#b8bfc7" }} />}
+            style={{ maxWidth: 360, flex: 1, margin: "0 32px", borderRadius: 8 }}
+            allowClear
+            onPressEnter={(e) => {
+              // 占位不实现，留 TODO 注释（M33 视觉升级：搜索框仅作入口占位）
+              console.log("TODO: 全局搜索", (e.target as HTMLInputElement).value);
+            }}
+          />
           <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
             <Badge count={unread} overflowCount={99} size="small">
               <Button

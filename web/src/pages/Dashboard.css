@@ -1,0 +1,94 @@
+/* ============================================================
+   Dashboard 局部样式（M33 视觉升级）
+   - 数据卡 .stat-card：白底 + 顶部渐变色条 + 悬停浮起
+   - 表格 .dashboard-table：强化表头 + 行悬停
+   样式局部化（不污染全站），复用 :root 中已有的 CSS 变量
+   ============================================================ */
+
+.stat-card {
+  position: relative;
+  background: #ffffff;
+  border: 1px solid #eef0f4;
+  border-radius: 14px;
+  padding: 18px 20px 16px;
+  box-shadow: 0 1px 3px rgba(31, 35, 41, 0.04);
+  transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+  overflow: hidden;
+}
+.stat-card:hover {
+  box-shadow: 0 6px 16px rgba(31, 35, 41, 0.10);
+  transform: translateY(-2px);
+  border-color: var(--stat-accent, #1677ff);
+}
+
+.stat-card-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(
+    90deg,
+    var(--stat-accent, #1677ff) 0%,
+    var(--stat-accent, #1677ff) 60%,
+    transparent 100%
+  );
+}
+
+.stat-card-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.stat-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: #f5f7fa;
+  color: var(--stat-accent, #1677ff);
+  font-size: 14px;
+}
+.stat-card-label {
+  font-size: 13px;
+  color: #646a73;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+}
+.stat-card-value {
+  font-size: 30px;
+  font-weight: 700;
+  color: #1f2329;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.stat-card-suffix {
+  font-size: 14px;
+  font-weight: 600;
+  margin-left: 4px;
+  color: #646a73;
+}
+.stat-card-sub {
+  font-size: 12px;
+  color: #8a919c;
+  margin-top: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- 表格强化（在 Dashboard 内的 Table 使用）---------- */
+.dashboard-table .ant-table-thead > tr > th {
+  background: #fafbfd;
+  font-weight: 600;
+}
+.dashboard-table .ant-table-tbody > tr:hover > td {
+  background: #f7faff;
+}
