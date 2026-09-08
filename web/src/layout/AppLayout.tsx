@@ -45,6 +45,7 @@ import { useTenant } from "../store/tenant";
 import { getUnreadCount } from "../api/endpoints";
 import { getToken, wsBase } from "../api/http";
 import { NOTIFY_CHANGED_EVENT } from "../pages/Notifications";
+import SearchDrawer from "../components/SearchDrawer";
 
 const { Header, Sider, Content } = Layout;
 
@@ -232,6 +233,8 @@ export default function AppLayout() {
   const openKey = parentKey(location.pathname);
   const user = localStorage.getItem("pms_user");
   const [unread, setUnread] = useState(0);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const loadUnread = async () => {
     if (!tenantCode) return;
@@ -450,14 +453,18 @@ export default function AppLayout() {
             酒店管理系统
           </Typography.Title>
           <Input
-            placeholder="搜索菜单、订单、宾客…"
+            placeholder="搜索菜单、订单、宾客…（按 Enter）"
             prefix={<SearchOutlined style={{ color: "#b8bfc7" }} />}
             style={{ maxWidth: 360, flex: 1, margin: "0 32px", borderRadius: 8 }}
             allowClear
             onPressEnter={(e) => {
-              // 占位不实现，留 TODO 注释（M33 视觉升级：搜索框仅作入口占位）
-              console.log("TODO: 全局搜索", (e.target as HTMLInputElement).value);
+              const v = (e.target as HTMLInputElement).value.trim();
+              if (v) {
+                setSearchQuery(v);
+                setSearchOpen(true);
+              }
             }}
+            onClick={(e) => (e.target as HTMLInputElement).select()}
           />
           <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
             <Badge count={unread} overflowCount={99} size="small">
@@ -519,6 +526,11 @@ export default function AppLayout() {
           />
         </Content>
       </Layout>
+      <SearchDrawer
+        open={searchOpen}
+        onClose={() => setSearchOpen(false)}
+        initialQuery={searchQuery}
+      />
     </Layout>
   );
 }

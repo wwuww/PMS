@@ -1571,3 +1571,31 @@ export interface AutoReleaseOut {
   released: number;
   ids: number[];
 }
+
+// ---------- M34d 全局搜索 ----------
+
+export type SearchEntityType =
+  | "guest"
+  | "booking"
+  | "room"
+  | "bill"
+  | "member"
+  | "group"
+  | "notification";
+
+export interface SearchResultItem {
+  type: SearchEntityType;
+  id: number | string;
+  title: string;
+  subtitle: string;
+  href: string;
+  badge?: string | null;
+  badge_color?: string | null;
+}
+
+export interface SearchResult {
+  items: SearchResultItem[];
+  total: number;
+  by_type: Record<string, number>;
+  query: string;
+}

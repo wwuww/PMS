@@ -124,6 +124,8 @@ import type {
   ChannelRatePlan,
   ChannelRatePlanIn,
   ChannelPushLog,
+  SearchResult,
+  SearchEntityType,
 } from "./types";
 
 export async function listTenants(): Promise<Tenant[]> {
@@ -2596,5 +2598,22 @@ export async function listDepositsByBooking(
   bookingId: number
 ): Promise<Deposit[]> {
   const { data } = await http.get<Deposit[]>(`/tenants/${tenantCode}/bookings/${bookingId}/deposits`);
+  return data;
+}
+
+// ---------- M34d 全局搜索 ----------
+
+export async function globalSearch(
+  tenantCode: string,
+  q: string,
+  types?: SearchEntityType[],
+  limit = 20,
+): Promise<SearchResult> {
+  const params: Record<string, string | number> = { q, limit };
+  if (types && types.length) params.types = types.join(",");
+  const { data } = await http.get<SearchResult>(
+    `/tenants/${tenantCode}/search`,
+    { params },
+  );
   return data;
 }
