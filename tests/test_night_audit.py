@@ -1,0 +1,207 @@
+"""夜审引擎（M4）集成测试：房租过账 / 营业日报 / 预离翻房 / 快照对比。"""
+
+import json
+
+from fastapi.testclient import TestClient
+
+from app.services.night_audit_scheduler import _categorize_suspended
+
+
+def _seed(client: TestClient) -> tuple[dict, dict, dict]:
+    t = client.post("/api/v1/tenants", json={"code": "na", "name": "夜审测试"}).json()
+    h = client.post(f"/api/v1/tenants/{t['id']}/hotels", json={"code": "H", "name": "店"}).json()
+    rt = client.post(
+        f"/api/v1/tenants/{t['id']}/room-types",
+        json={"code": "STD", "name": "标间", "base_price": 30000},
+    ).json()
+    client.post(
+        f"/api/v1/hotels/{h['id']}/rooms",
+        json=[{"room_type_id": rt["id"], "room_no": "0101"}],
+    )
+    return t, h, rt
+
+
+def _check_in(
+    client: TestClient, t: dict, rt: dict, h: dict, room_no: str, phone: str, cin: str, cout: str
+) -> dict:
+    bk = client.post(
+        f"/api/v1/tenants/{t['code']}/bookings",
+        json={
+            "hotel_id": h["id"],
+            "room_type_id": rt["id"],
+            "guest_name": "G",
+            "guest_phone": phone,
+            "check_in_date": cin,
+            "check_out_date": cout,
+            "room_no": room_no,
+        },
+    ).json()
+    client.post(
+        f"/api/v1/tenants/{t['code']}/bookings/{bk['id']}/check-in",
+        json={"room_no": room_no},
+    )
+    return bk
+
+
+class TestNightAudit:
+    def test_room_charge_and_report(self, client: TestClient) -> None:
+        t, h, rt = _seed(client)
+        _check_in(client, t, rt, h, "0101", "13700000001", "2026-10-01", "2026-10-03")
+
+        rep = client.post(
+            f"/api/v1/tenants/{t['code']}/night-audit",
+            json={"hotel_id": h["id"], "business_date": "2026-10-01"},
+        ).json()
+        assert rep["occupied_rooms"] == 1
+        assert rep["room_revenue"] == 30000  # 当日房租过账
+        assert rep["total_revenue"] == 30000
+
+        # 营业日已关闭
+        bds = client.get(f"/api/v1/tenants/{t['code']}/business-days").json()
+        assert bds[0]["status"] == "CLOSED"
+
+    def test_pre_departure_flip(self, client: TestClient) -> None:
+        t, h, rt = _seed(client)
+        _check_in(client, t, rt, h, "0101", "13700000002", "2026-10-01", "2026-10-03")
+
+        # 夜审 2026-10-02：次日(10-03)应离店 → 自动翻房 vacant_dirty
+        client.post(
+            f"/api/v1/tenants/{t['code']}/night-audit",
+            json={"hotel_id": h["id"], "business_date": "2026-10-02"},
+        )
+        dirty = client.get(f"/api/v1/tenants/{t['code']}/rooms?state=vacant_dirty").json()
+        assert len(dirty) == 1
+
+    def test_duplicate_audit_blocked(self, client: TestClient) -> None:
+        t, h, rt = _seed(client)
+        _check_in(client, t, rt, h, "0101", "13700000003", "2026-10-01", "2026-10-03")
+        client.post(
+            f"/api/v1/tenants/{t['code']}/night-audit",
+            json={"hotel_id": h["id"], "business_date": "2026-10-01"},
+        )
+        resp = client.post(
+            f"/api/v1/tenants/{t['code']}/night-audit",
+            json={"hotel_id": h["id"], "business_date": "2026-10-01"},
+        )
+        assert resp.status_code == 409  # 已关闭不可重复夜审
+
+    def test_snapshot_before_after_distribution(self, client: TestClient) -> None:
+        t, h, rt = _seed(client)
+        _check_in(client, t, rt, h, "0101", "13700000011", "2026-10-01", "2026-10-03")
+
+        rep = client.post(
+            f"/api/v1/tenants/{t['code']}/night-audit",
+            json={"hotel_id": h["id"], "business_date": "2026-10-01"},
+        ).json()
+
+        snap = json.loads(rep["snapshot"])
+        assert "before" in snap and "after" in snap
+        # 夜审前：1 间在住
+        assert snap["before"]["occupied_rooms"] == 1
+        assert snap["before"]["room_state_distribution"]["occupied"] == 1
+        # 夜审后：过账房租写入快照
+        assert snap["after"]["posted_room_charge"] == 30000
+
+    def test_snapshot_flip_delta(self, client: TestClient) -> None:
+        t, h, rt = _seed(client)
+        _check_in(client, t, rt, h, "0101", "13700000012", "2026-10-01", "2026-10-03")
+
+        # 夜审 2026-10-02：次日(10-03)应离店 → 自动翻房，在住 -1
+        rep = client.post(
+            f"/api/v1/tenants/{t['code']}/night-audit",
+            json={"hotel_id": h["id"], "business_date": "2026-10-02"},
+        ).json()
+
+        snap = json.loads(rep["snapshot"])
+        assert snap["diff"]["occupied_delta"] == 1  # 在住减少 1 间
+        assert "0101" in snap["after"]["flipped_rooms"]
+        # 翻房后该房已是空脏
+        dirty = client.get(f"/api/v1/tenants/{t['code']}/rooms?state=vacant_dirty").json()
+        assert any(r["room_no"] == "0101" for r in dirty)
+
+    def test_snapshot_detects_occupied_without_booking(self, client: TestClient) -> None:
+        t, h, rt = _seed(client)
+        # 直接把房间翻成在住（无对应在住预订），制造房态差异
+        tr = client.post(
+            f"/api/v1/tenants/{t['code']}/rooms/0101/transition",
+            json={"trigger": "check_in"},
+        )
+        assert tr.status_code == 200
+        assert tr.json()["state"] == "occupied"
+
+        rep = client.post(
+            f"/api/v1/tenants/{t['code']}/night-audit",
+            json={"hotel_id": h["id"], "business_date": "2026-10-01"},
+        ).json()
+
+        snap = json.loads(rep["snapshot"])
+        anomalies = snap["before"]["anomalies"]
+        assert any(a["room_no"] == "0101" and a["type"] == "occupied_without_booking" for a in anomalies)
+
+
+class TestSuspendedReasonCategorize:
+    def test_categorize_suspended(self) -> None:
+        assert (
+            _categorize_suspended(Exception("Multiple rows were found when one or none was required"))
+            == "重复入住脏数据"
+        )
+        assert _categorize_suspended(Exception("room_type 不存在")) == "房型数据缺失"
+        assert (
+            _categorize_suspended(Exception("非法流转: 当前状态 occupied 不允许触发 check_out"))
+            == "房态流转非法"
+        )
+        assert _categorize_suspended(Exception("UNIQUE constraint failed: business_days")) == "数据完整性冲突"
+        assert _categorize_suspended(Exception("database connection timeout")) == "数据库/连接异常"
+        assert _categorize_suspended(Exception("some weird failure")) == "未知异常"
+
+
+class TestNightAuditBoard:
+    def _seed_hotel(self, client, t, code, name):
+        return client.post(
+            f"/api/v1/tenants/{t['id']}/hotels", json={"code": code, "name": name}
+        ).json()
+
+    def test_board_multi_hotel(self, client: TestClient) -> None:
+        t = client.post("/api/v1/tenants", json={"code": "nab", "name": "看板测试"}).json()
+        h1 = self._seed_hotel(client, t, "H1", "店一")
+        h2 = self._seed_hotel(client, t, "H2", "店二")
+        rt = client.post(
+            f"/api/v1/tenants/{t['id']}/room-types",
+            json={"code": "STD", "name": "标间", "base_price": 30000},
+        ).json()
+        # 注意：Room 唯一约束为 (tenant_id, room_no)，同一租户下两店须用不同房号
+        client.post(f"/api/v1/hotels/{h1['id']}/rooms", json=[{"room_type_id": rt["id"], "room_no": "0101"}])
+        client.post(f"/api/v1/hotels/{h2['id']}/rooms", json=[{"room_type_id": rt["id"], "room_no": "0201"}])
+
+        for hid, phone, rno in (
+            (h1["id"], "13700000021", "0101"),
+            (h2["id"], "13700000022", "0201"),
+        ):
+            bk = client.post(
+                f"/api/v1/tenants/{t['code']}/bookings",
+                json={
+                    "hotel_id": hid,
+                    "room_type_id": rt["id"],
+                    "guest_name": "G",
+                    "guest_phone": phone,
+                    "check_in_date": "2026-10-01",
+                    "check_out_date": "2026-10-03",
+                    "room_no": rno,
+                },
+            ).json()
+            client.post(
+                f"/api/v1/tenants/{t['code']}/bookings/{bk['id']}/check-in", json={"room_no": rno}
+            )
+            client.post(
+                f"/api/v1/tenants/{t['code']}/night-audit",
+                json={"hotel_id": hid, "business_date": "2026-10-01"},
+            )
+
+        board = client.get(f"/api/v1/tenants/{t['code']}/night-audit/board").json()
+        assert board["hotel_count"] == 2
+        assert board["total_suspended"] == 0
+        assert {h["name"] for h in board["hotels"]} == {"店一", "店二"}
+        for h in board["hotels"]:
+            assert h["latest_status"] == "CLOSED"
+            assert h["latest_report"]["room_revenue"] == 30000
+            assert h["latest_report"]["occ_pct"] == 100

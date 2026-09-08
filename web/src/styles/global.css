@@ -1,0 +1,301 @@
+/* ============================================================
+   PMS 全局样式优化 —— 简约 / 清晰 / 大方 / 细致
+   原则：低饱和底色 + 白色卡片 + 轻阴影 + 统一圆角与留白
+   ============================================================ */
+
+:root {
+  --pms-bg: #f5f7fa;          /* 页面底色（低饱和冷灰） */
+  --pms-card-border: #eef0f4; /* 卡片描边 */
+  --pms-text-title: #1f2329;  /* 标题色 */
+  --pms-text-sub: #646a73;    /* 次要文字 */
+  --pms-primary: #1677ff;
+  --pms-shadow-sm: 0 1px 2px rgba(31, 35, 41, 0.04);
+  --pms-shadow-md: 0 4px 16px rgba(31, 35, 41, 0.08);
+}
+
+html,
+body,
+#root {
+  min-height: 100vh;
+}
+
+body {
+  background: var(--pms-bg);
+  color: var(--pms-text-title);
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ---------- 卡片：常规实色（全站玻璃拟态已按需撤销，仅保留 .glass-card 局部组件） ---------- */
+.ant-card {
+  box-shadow: 0 2px 8px rgba(31, 35, 41, 0.06);
+}
+.ant-card .ant-card-head {
+  border-bottom-color: var(--pms-card-border);
+  min-height: 44px;
+}
+.ant-card .ant-card-head-title {
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+.ant-card .ant-card-body {
+  color: var(--pms-text-title);
+}
+
+/* ---------- 表格：清爽表头 + 行悬停 ---------- */
+.ant-table-wrapper .ant-table {
+  font-size: 13.5px;
+}
+.ant-table-wrapper .ant-table-thead > tr > th {
+  background: #fafbfd;
+  color: var(--pms-text-sub);
+  font-weight: 600;
+  border-block-end: 1px solid var(--pms-card-border);
+}
+.ant-table-wrapper .ant-table-tbody > tr > td {
+  border-block-end: 1px solid #f2f4f7;
+}
+.ant-table-wrapper .ant-table-tbody > tr:hover > td {
+  background: #f7faff;
+}
+.ant-table-wrapper .ant-table-pagination.ant-pagination {
+  margin-block-end: 0;
+}
+
+/* ---------- 按钮 / 输入：轻描边统一 ---------- */
+.ant-btn {
+  box-shadow: none;
+  font-weight: 500;
+}
+.ant-btn-primary:not(:disabled):hover {
+  box-shadow: 0 2px 8px rgba(22, 119, 255, 0.28);
+}
+.ant-input,
+.ant-select-selector,
+.ant-picker,
+.ant-input-number {
+  border-color: #e3e6eb;
+}
+.ant-input:hover,
+.ant-select:hover .ant-select-selector,
+.ant-picker:hover {
+  border-color: #b8c4d0 !important;
+}
+
+/* ---------- 标签 / 徽章：柔和圆角 ---------- */
+.ant-tag {
+  border-radius: 4px;
+  margin-inline-end: 0;
+}
+
+/* ---------- 弹窗 / 抽屉：大圆角 + 柔和投影 ---------- */
+.ant-modal .ant-modal-content {
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(31, 35, 41, 0.14);
+}
+.ant-modal .ant-modal-header {
+  margin-bottom: 12px;
+}
+.ant-drawer .ant-drawer-content {
+  border-radius: 12px 0 0 12px;
+}
+
+/* ---------- 选项卡（导航 Tab）：贴合内容区 ---------- */
+.ant-tabs.ant-tabs-card .ant-tabs-card-bar .ant-tabs-tab {
+  border-radius: 8px 8px 0 0;
+}
+.ant-tabs.ant-tabs-card .ant-tabs-nav {
+  margin-bottom: 0;
+}
+
+/* ---------- 菜单（左侧导航）---------- */
+.ant-layout-sider .ant-menu {
+  border-inline-end: none;
+}
+.ant-layout-sider .ant-menu-item,
+.ant-layout-sider .ant-menu-submenu-title {
+  border-radius: 6px;
+  margin-inline: 8px;
+  width: calc(100% - 16px);
+}
+
+/* ---------- 页面标题（Typography.Title level=4/5）---------- */
+.ant-typography h4.ant-typography,
+.ant-typography h5.ant-typography {
+  margin-bottom: 0;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+/* ---------- 细滚动条（桌面端）---------- */
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: #d3d8de;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: #b8bfc7;
+  background-clip: content-box;
+  border: 2px solid transparent;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ---------- 空状态 / 描述列表 ---------- */
+.ant-empty-description {
+  color: var(--pms-text-sub);
+}
+.ant-descriptions-item-label {
+  color: var(--pms-text-sub) !important;
+}
+
+/* ============================================================
+   边界与分割强化（第二轮）：让信息分区更清晰
+   ============================================================ */
+
+:root {
+  --pms-divider: #d9dde3; /* 统一分割线色（加重后） */
+}
+
+/* ---------- 表格：行列边界更明确 ---------- */
+.ant-table-wrapper .ant-table-tbody > tr > td {
+  border-block-end: 1px solid var(--pms-divider);
+}
+.ant-table-wrapper .ant-table-thead > tr > th {
+  border-block-end: 1px solid var(--pms-divider);
+}
+/* 相邻列之间加极淡竖向分割（克制，仅表头） */
+.ant-table-wrapper .ant-table-thead > tr > th:not(:last-child)::before {
+  background: #eceff3;
+}
+/* 极简表格：无斑马纹，纯白行 + 细分割线（对齐营业日报参考风格） */
+
+/* ---------- 选项卡区：Tab 栏与内容区之间一条干净的分界 ---------- */
+.ant-tabs.ant-tabs-card > .ant-tabs-nav::before {
+  border-block-end: 1px solid var(--pms-divider);
+}
+.ant-tabs .ant-tabs-content-holder {
+  border-top: 1px solid transparent;
+}
+
+/* ---------- 弹窗：头/尾与内容区加淡分割 ---------- */
+.ant-modal .ant-modal-header {
+  border-bottom: 1px solid #f2f4f7;
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+}
+.ant-modal .ant-modal-footer {
+  border-top: 1px solid #f2f4f7;
+  margin-top: 16px;
+  padding-top: 12px;
+}
+
+/* ---------- 描述列表（详情页）：行分割更清楚 ---------- */
+.ant-descriptions > .ant-descriptions-view .ant-descriptions-item {
+  padding-block-end: 10px;
+}
+.ant-descriptions-bordered .ant-descriptions-item-label,
+.ant-descriptions-bordered .ant-descriptions-item-content {
+  border-inline-end: 1px solid var(--pms-divider);
+  border-block-end: 1px solid var(--pms-divider);
+}
+
+/* ---------- 列表 / 时间轴 ---------- */
+.ant-list .ant-list-item {
+  border-block-end: 1px solid #f2f4f7;
+}
+.ant-card .ant-card-head {
+  border-block-end: 1px solid var(--pms-divider);
+}
+
+/* ---------- 折叠面板 / 分割线组件 ---------- */
+.ant-divider-horizontal {
+  border-block-start-color: #f0f2f5;
+}
+.ant-collapse {
+  border-color: var(--pms-card-border);
+}
+.ant-collapse > .ant-collapse-item > .ant-collapse-header {
+  border-block-end: 1px solid #f2f4f7;
+}
+
+/* ---------- 工具栏区（表格上方的操作行）与表格之间留出呼吸 ---------- */
+.ant-table-wrapper {
+  margin-top: 2px;
+}
+
+/* ============================================================
+   第三轮：玻璃拟态数据卡片
+   ============================================================ */
+
+/* 彩色渐变底带 → 普通实色信息条（M32.8：玻璃拟态全部撤销） */
+.glass-band {
+  background: #ffffff;
+  border: 1px solid #eef0f4;
+  border-radius: 14px;
+  padding: 14px;
+  box-shadow: 0 1px 4px rgba(31, 35, 41, 0.06);
+}
+
+.glass-card {
+  background: #ffffff;
+  border: 1px solid #eef0f4;
+  border-radius: 12px;
+  padding: 12px 16px 10px;
+  box-shadow: 0 1px 4px rgba(31, 35, 41, 0.06);
+  transition: box-shadow 0.2s ease;
+}
+.glass-card:hover {
+  box-shadow: 0 4px 12px rgba(31, 35, 41, 0.10);
+}
+.glass-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.glass-card-label {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--pms-text-sub, #646a73);
+  letter-spacing: 0.3px;
+}
+.glass-card-icon {
+  font-size: 17px;
+  line-height: 1;
+  color: var(--accent, #1677ff);
+  opacity: 0.85;
+}
+.glass-card-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--pms-text-title, #1f2329);
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.glass-card-suffix {
+  font-size: 13px;
+  font-weight: 500;
+  margin-left: 3px;
+  color: var(--pms-text-sub, #646a73);
+}
+.glass-card-sub {
+  font-size: 12px;
+  color: #8a919c;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

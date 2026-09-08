@@ -1,0 +1,33 @@
+# 统一行尾：仓库内一律 LF，Windows 工作区按平台还原
+* text=auto
+
+# Shell 脚本必须 LF，否则 Git Bash 执行时 \r 会被当作命令的一部分
+*.sh  text eol=lf
+*.py  text eol=lf
+*.mjs text eol=lf
+*.ts  text eol=lf
+*.tsx text eol=lf
+*.js  text eol=lf
+*.json text eol=lf
+*.md  text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.ini text eol=lf
+*.toml text eol=lf
+
+# PowerShell 脚本在 Windows 下用 CRLF
+*.ps1 text eol=crlf
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# 二进制文件：不做行尾转换与 diff
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.woff binary
+*.woff2 binary
+*.ttf binary

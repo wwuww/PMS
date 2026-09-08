@@ -1,0 +1,46 @@
+# PMS 生产基础设施（Sprint 15）：PostgreSQL 16 + Redis 7
+# 启动：docker compose -f infra/docker-compose.yml up -d
+# 应用侧切换（零代码改动，仅环境变量）：
+#   PMS_DATABASE_URL=postgresql+asyncpg://pms:pms@localhost:5432/pms
+#   PMS_REDIS_URL=redis://localhost:6379/0
+#   PMS_RATE_LIMIT_ENABLED=true
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: pms
+      POSTGRES_PASSWORD: pms
+      POSTGRES_DB: pms
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pms"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ShardingSphere-Proxy 5.x（万店规模分库分表，见 shardingsphere/ 说明）
+  # shardingsphere:
+  #   image: apache/shardingsphere-proxy:5.5.0
+  #   ports: ["3307:3307"]
+  #   volumes:
+  #     - ./shardingsphere:/opt/shardingsphere-proxy/conf
+
+volumes:
+  pg_data:
+  redis_data:

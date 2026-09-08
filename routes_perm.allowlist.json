@@ -1,0 +1,1180 @@
+{
+  "generated_at": "2026-09-07T06:52:45+00:00",
+  "total_routes": 195,
+  "protected_count": 30,
+  "unprotected_count": 165,
+  "unprotected_writes_count": 88,
+  "unprotected_reads_count": 77,
+  "items": [
+    {
+      "method": "POST",
+      "path": "/api/v1/hotels/{hotel_id}/rooms",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/adjustments",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/ai/alerts",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/ai/alerts/{alert_id}/acknowledge",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/ai/alerts/{alert_id}/resolve",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/ai/chat-sessions",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/ai/chat-sessions",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/ai/chat-sessions/{session_id}",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/ai/chat-sessions/{session_id}/close",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/ai/chat-sessions/{session_id}/handoff",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/ai/chat-sessions/{session_id}/messages",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/ai/chat-sessions/{session_id}/messages",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/analytics/channel-revenue",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/analytics/custom-report",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/analytics/dashboard",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/analytics/data-export",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/analytics/export",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/analytics/forecast",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/analytics/hotel-ranking",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/analytics/housekeeping-performance",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/analytics/oversell-warnings",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/analytics/payment-summary",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/analytics/room-type-revenue",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/analytics/snapshots",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/analytics/snapshots/generate",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/approvals",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/approvals",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/approvals/{ticket_id}/decide",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/ar-accounts",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/ar-accounts",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/ar-accounts/{account_id}/bills",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/ar-accounts/{account_id}/charge",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/ar-accounts/{account_id}/repayments",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/audit-logs",
+      "has_perm": true,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/auth/check",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/auth/login",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/auth/logout",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/auth/refresh",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/bills",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/bills",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/bills/{bill_id}",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/bills/{bill_id}/adjustments",
+      "has_perm": true,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/bills/{bill_id}/apply-prepay",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/bills/{bill_id}/charges",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/bills/{bill_id}/pay-points",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/bills/{bill_id}/payments",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/bills/{bill_id}/refund",
+      "has_perm": true,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/bills/{bill_id}/settle",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/bookings",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/bookings",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/bookings/link",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/bookings/settle-to-master",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/bookings/unlink",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/bookings/{booking_id}/cancel",
+      "has_perm": true,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/bookings/{booking_id}/change-room",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/bookings/{booking_id}/check-in",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/bookings/{booking_id}/check-out",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/bookings/{booking_id}/extend-stay",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/bookings/{booking_id}/extras",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/bookings/{booking_id}/logs",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/bookings/{booking_id}/noshow",
+      "has_perm": true,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/business-days",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/channels/{channel}/availability-push",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/commission-reconciliations",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/commission-rules",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/commission-rules",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/complaints",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/complaints",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/complaints/{complaint_id}/transition",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/daily-reports",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/fnb/kitchen/tickets",
+      "has_perm": true,
+      "is_write": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/fnb/menu-items",
+      "has_perm": true,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/fnb/menu-items",
+      "has_perm": true,
+      "is_write": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/tenants/{tenant_id}/fnb/menu-items/{item_id}",
+      "has_perm": true,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/fnb/menu-items/{item_id}/sold-out",
+      "has_perm": true,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/fnb/orders",
+      "has_perm": true,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/fnb/orders",
+      "has_perm": true,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/fnb/orders/{order_id}/discount",
+      "has_perm": true,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/fnb/orders/{order_id}/items",
+      "has_perm": true,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/fnb/orders/{order_id}/items/{item_id}/ready",
+      "has_perm": true,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/fnb/orders/{order_id}/items/{item_id}/served",
+      "has_perm": true,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/fnb/orders/{order_id}/items/{item_id}/void",
+      "has_perm": true,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/fnb/orders/{order_id}/settle-cash",
+      "has_perm": true,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/fnb/orders/{order_id}/settle-room",
+      "has_perm": true,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/fnb/reports/sales",
+      "has_perm": true,
+      "is_write": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/fnb/room-lookup",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/fnb/tables",
+      "has_perm": true,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/fnb/tables",
+      "has_perm": true,
+      "is_write": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/tenants/{tenant_id}/fnb/tables/{table_id}/state",
+      "has_perm": true,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/group-blocks",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/group-blocks",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/group-blocks/{block_id}",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/group-blocks/{block_id}/allocations/{alloc_id}/settle",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/group-blocks/{block_id}/assign",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/group-blocks/{block_id}/check-in",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/group-blocks/{block_id}/close",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/group-blocks/{block_id}/settlement",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/group/dashboard",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/group/price-policies",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/group/price-policies",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/group/settlement",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/guests",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/guests",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/guests/search",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/guests/{guest_id}",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/tenants/{tenant_id}/guests/{guest_id}",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/hotels",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/hotels",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/housekeeping-tasks",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/housekeeping-tasks",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/housekeeping-tasks/batch-assign",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/housekeeping-tasks/batch-done",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/housekeeping-tasks/{task_id}/assign",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/housekeeping-tasks/{task_id}/done",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/housekeeping-tasks/{task_id}/inspect",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/manager/dashboard",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/members",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/members/{phone}",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/members/{phone}/recharge",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/mp/offers",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/mp/orders",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/mp/orders/{out_trade_no}",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/night-audit",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/night-audit/auto-run",
+      "has_perm": true,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/night-audit/board",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/notification-preferences",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/tenants/{tenant_id}/notification-preferences",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/notification-subscriptions",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/tenants/{tenant_id}/notification-subscriptions",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/notifications",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/notifications/read-all",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/notifications/unread-count",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/notifications/{notification_id}/read",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/openapi/apps",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/openapi/apps",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/openapi/apps/{app_id}/keys",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/openapi/apps/{app_id}/keys",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/openapi/apps/{app_id}/keys/{key_id}/revoke",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/openapi/v1/availability",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/openapi/v1/bookings",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/openapi/v1/hotels",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/openapi/v1/hotels/{hotel_id}/rooms",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/openapi/v1/night-audit/board",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/openapi/verify-key",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/openapi/webhooks",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/openapi/webhooks",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/openapi/webhooks/{subscription_id}/test",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/ota/configs",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/tenants/{tenant_id}/ota/configs",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/ota/{channel}/inventory/push",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/ota/{channel}/webhook/orders",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/pay-orders",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/pay-orders/{out_trade_no}/close",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/pay/notify",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/pay/reconcile",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/price-calendar",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/price-calendar",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/price-calendar/batch",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/psb-tasks",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/psb-tasks",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/psb-tasks/{task_id}/upload",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/rate-codes",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/rate-codes",
+      "has_perm": true,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/reception/advance",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/reception/check-in",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/reception/context",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/roles",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/roles",
+      "has_perm": true,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/room-types",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/room-types",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/room-types/{room_type_id}/availability",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/rooms",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/rooms/recommend",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/rooms/{room_no}/dnd",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/rooms/{room_no}/state-events",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/rooms/{room_no}/transition",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/shifts",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/shifts/open",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/shifts/{shift_id}/close",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/users",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/users",
+      "has_perm": true,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/users/{user_id}/roles",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/users/{user_id}/roles",
+      "has_perm": true,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/wake-up-calls",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/wake-up-calls",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/wake-up-calls/{call_id}/cancel",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/wake-up-calls/{call_id}/done",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/yield/pricing/recommend",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/yield/pricing/recommendations",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/yield/pricing/recommendations/{rec_id}/apply",
+      "has_perm": true,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/yield/pricing/recommendations/{rec_id}/reject",
+      "has_perm": true,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/yield/rules",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/tenants/{tenant_id}/yield/rules",
+      "has_perm": false,
+      "is_write": true
+    }
+  ]
+}

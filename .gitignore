@@ -1,0 +1,72 @@
+# ============================================================
+# PMS 酒店管理系统 — 版本控制忽略规则
+# 目标：仓库只纳入源码 / 配置 / 迁移 / 测试 / 文档
+# ============================================================
+
+# ---------- 数据库 & 运行时产物 ----------
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+_smoke*
+_live_smoke*
+_alembic_check*
+
+# ---------- Python ----------
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# ---------- 前端（Vite + TypeScript） ----------
+node_modules/
+web/node_modules/
+web/dist/
+web/.vite/
+*.tsbuildinfo
+web/vite.config.ts.timestamp-*.mjs
+web/e2e_*.png
+
+# ---------- 日志 ----------
+*.log
+
+# ---------- 环境变量 / 密钥 ----------
+.env
+.env.local
+.env.*.local
+
+# ---------- 编辑器 / 操作系统 ----------
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---------- 本地工具与临时产物 ----------
+.workbuddy/
+repro_audit.py
+
+# 版本库备份/损坏恢复目录（不应纳入版本控制）
+.git.bak/
+.git.broken/
+
+# CI 门禁日志（失败后保留供排查，下次运行前自动清空）
+.ci-logs/
+
+# M30 性能基线产物
+_perf.db
+.perf_baseline.json
