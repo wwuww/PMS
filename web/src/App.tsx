@@ -37,6 +37,7 @@ import Rooms from "./pages/Rooms";
 import Adjustments from "./pages/Adjustments";
 import PricePolicy from "./pages/PricePolicy";
 import Channel from "./pages/Channel";
+import ChannelCenter from "./pages/ChannelCenter";
 import Reports from "./pages/Reports";
 import GroupBlock from "./pages/GroupBlock";
 import Pos from "./pages/Pos";
