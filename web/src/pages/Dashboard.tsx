@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import type { CSSProperties, ReactNode } from "react";
 import {
   Card,
   Col,
@@ -27,47 +26,8 @@ import { managerDashboard, runNightAudit, nightAuditBoard } from "../api/endpoin
 import type { Dashboard, Booking, NightAuditBoard } from "../api/types";
 import { useTenant } from "../store/tenant";
 import { fmtCents } from "../utils/format";
+import StatCard from "../components/StatCard";
 import "./Dashboard.css";
-
-/**
- * 数据卡（M33 升级版）
- * - 顶部 3px 渐变色条（驱动色 = --stat-accent）
- * - 28px 灰底图标 + accent 描边色
- * - 数字 30px tabular-nums + 悬停浮起
- */
-export function StatCard({
-  label,
-  value,
-  suffix,
-  sub,
-  accent,
-  icon,
-}: {
-  label: string;
-  value: ReactNode;
-  suffix?: string;
-  sub?: string;
-  accent: string;
-  icon?: ReactNode;
-}) {
-  return (
-    <div
-      className="stat-card"
-      style={{ "--stat-accent": accent } as CSSProperties}
-    >
-      <span className="stat-card-bar" />
-      <div className="stat-card-top">
-        <span className="stat-card-icon">{icon}</span>
-        <span className="stat-card-label">{label}</span>
-      </div>
-      <div className="stat-card-value">
-        {value}
-        {suffix && <span className="stat-card-suffix">{suffix}</span>}
-      </div>
-      {sub && <div className="stat-card-sub">{sub}</div>}
-    </div>
-  );
-}
 
 export default function DashboardPage() {
   const { tenantCode, hotelId } = useTenant();

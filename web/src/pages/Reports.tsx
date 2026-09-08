@@ -5,6 +5,7 @@ import {
   Card,
   Col,
   DatePicker,
+  Empty,
   Form,
   Row,
   Select,
@@ -14,13 +15,22 @@ import {
   message,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { DownloadOutlined, ReloadOutlined } from "@ant-design/icons";
+import {
+  DownloadOutlined,
+  ReloadOutlined,
+  DollarOutlined,
+  ShopOutlined,
+  RiseOutlined,
+  FundOutlined,
+} from "@ant-design/icons";
 import dayjs from "dayjs";
 import { useSearchParams } from "react-router-dom";
 import { useTenant } from "../store/tenant";
 import { exportReport } from "../api/endpoints";
 import { fmtBps, fmtCents } from "../utils/format";
 import type { ReportExport, ReportType } from "../api/types";
+import StatCard from "../components/StatCard";
+import "./Reports.css";
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -145,17 +155,22 @@ export default function Reports() {
 
   const columns = useMemo<ColumnsType<Row>>(() => {
     if (!rows.length) return [];
-    return collectKeys(rows).map((k) => ({
-      title: k,
-      dataIndex: k,
-      key: k,
-      render: (val: unknown) =>
-        typeof val === "number"
-          ? val.toLocaleString("zh-CN")
-          : val == null
-          ? "—"
-          : String(val),
-    }));
+    return collectKeys(rows).map((k) => {
+      // 动态判断：列首行若为 number → 数字列 → 右对齐 + 等宽
+      const isNum = rows.length > 0 && typeof rows[0][k] === "number";
+      return {
+        title: k,
+        dataIndex: k,
+        key: k,
+        align: isNum ? ("right" as const) : ("left" as const),
+        render: (val: unknown) =>
+          typeof val === "number"
+            ? val.toLocaleString("zh-CN")
+            : val == null
+            ? "—"
+            : String(val),
+      };
+    });
   }, [rows]);
 
   const handleCSV = () => {
@@ -174,12 +189,25 @@ export default function Reports() {
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
-        <Title level={4} style={{ margin: 0 }}>
-          报表中心
-        </Title>
+      <div
+        className="reports-header"
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-end",
+          marginBottom: 20,
+        }}
+      >
+        <div>
+          <Title level={4} style={{ margin: 0, marginBottom: 4 }}>
+            报表中心
+          </Title>
+          <Text type="secondary" style={{ fontSize: 13 }}>
+            多维度经营报表 · 导出与下载
+          </Text>
+        </div>
         <Space>
-          <Button icon={<ReloadOutlined />} onClick={run} loading={loading}>
+          <Button icon={<ReloadOutlined />} onClick={run} loading={loading} type="primary">
             生成报表
           </Button>
           <Button icon={<DownloadOutlined />} disabled={!rows.length} onClick={handleCSV}>
@@ -188,47 +216,42 @@ export default function Reports() {
         </Space>
       </div>
       {summary && (
-        <Row gutter={16} style={{ marginBottom: 16 }}>
+        <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
           <Col xs={12} sm={12} md={6}>
-            <div className="glass-card">
-              <div className="glass-card-top">
-                <span className="glass-card-label">房票收入</span>
-              </div>
-              <div className="glass-card-value">{fmtCents(summary.room)}</div>
-              <div className="glass-card-sub">
-                {summary.hotelName ?? ""}
-                {summary.days ? ` · ${summary.days} 天` : ""}
-              </div>
-            </div>
+            <StatCard
+              label="房票收入"
+              value={fmtCents(summary.room)}
+              sub={`${summary.hotelName ?? ""}${summary.days ? ` · ${summary.days} 天` : ""}`}
+              accent="#1677ff"
+              icon={<DollarOutlined />}
+            />
           </Col>
           <Col xs={12} sm={12} md={6}>
-            <div className="glass-card">
-              <div className="glass-card-top">
-                <span className="glass-card-label">其他应收</span>
-              </div>
-              <div className="glass-card-value">{fmtCents(summary.other)}</div>
-              <div className="glass-card-sub">杂费 / 餐饮 / 其他</div>
-            </div>
+            <StatCard
+              label="其他应收"
+              value={fmtCents(summary.other)}
+              sub="杂费 / 餐饮 / 其他"
+              accent="#13c2c2"
+              icon={<ShopOutlined />}
+            />
           </Col>
           <Col xs={12} sm={12} md={6}>
-            <div className="glass-card">
-              <div className="glass-card-top">
-                <span className="glass-card-label">总营收</span>
-              </div>
-              <div className="glass-card-value">{fmtCents(summary.total)}</div>
-              <div className="glass-card-sub">房票 + 其他应收</div>
-            </div>
+            <StatCard
+              label="总营收"
+              value={fmtCents(summary.total)}
+              sub="房票 + 其他应收"
+              accent="#fa8c16"
+              icon={<RiseOutlined />}
+            />
           </Col>
           <Col xs={12} sm={12} md={6}>
-            <div className="glass-card">
-              <div className="glass-card-top">
-                <span className="glass-card-label">单房收益 RevPAR</span>
-              </div>
-              <div className="glass-card-value">{fmtCents(summary.revpar)}</div>
-              <div className="glass-card-sub">
-                ADR {fmtCents(summary.adr)} · 出租率 {fmtBps(summary.occPctBps)}
-              </div>
-            </div>
+            <StatCard
+              label="单房收益 RevPAR"
+              value={fmtCents(summary.revpar)}
+              sub={`ADR ${fmtCents(summary.adr)} · 出租率 ${fmtBps(summary.occPctBps)}`}
+              accent="#722ed1"
+              icon={<FundOutlined />}
+            />
           </Col>
         </Row>
       )}
@@ -244,7 +267,7 @@ export default function Reports() {
           }
         />
       )}
-      <Card style={{ marginBottom: 16 }}>
+      <Card className="reports-filter-card">
         <Form
           form={form}
           layout="inline"
@@ -277,6 +300,7 @@ export default function Reports() {
         </Form>
       </Card>
       <Card
+        className="reports-preview-card"
         title={
           data
             ? `报表：${data.report_type ?? "未命名"}（${rows.length} 行）`
@@ -292,9 +316,27 @@ export default function Reports() {
             columns={columns}
             scroll={{ x: "max-content" }}
             pagination={{ pageSize: 20 }}
+            className="reports-table"
           />
         ) : (
-          <Text type="secondary">选择报表类型与门店后点击「生成报表」。</Text>
+          <Empty
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+            imageStyle={{ height: 80 }}
+            description={
+              <div>
+                <div style={{ marginBottom: 4, color: "#646a73" }}>暂无报表数据</div>
+                <div style={{ fontSize: 12, color: "#8a919c" }}>
+                  选择报表类型与门店后点击「生成报表」开始查询
+                </div>
+              </div>
+            }
+            className="reports-empty"
+            style={{ padding: "40px 0" }}
+          >
+            <Button type="primary" onClick={run} icon={<ReloadOutlined />} loading={loading}>
+              立即生成
+            </Button>
+          </Empty>
         )}
       </Card>
     </div>

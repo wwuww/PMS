@@ -1,0 +1,42 @@
+/* ============================================================
+   Reports 局部样式（M33b 视觉升级）
+   - 数字列右对齐 + 等宽数字
+   - 空态插画优化（由 .reports-empty 控制）
+   - 报表筛选卡 + 预览卡之间加呼吸
+   ============================================================ */
+
+/* 表格数字列：右对齐 + 等宽数字（antd align="right" 已控 td text-align，tabular-nums 控字宽） */
+.reports-table .ant-table-thead > tr > th {
+  background: #fafbfd;
+  font-weight: 600;
+}
+.reports-table .ant-table-tbody > tr > td {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+.reports-table .ant-table-tbody > tr > td[align="right"],
+.reports-table .ant-table-tbody > tr > td.is-numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+.reports-table .ant-table-tbody > tr:hover > td {
+  background: #f7faff;
+}
+
+/* 报表筛选卡与预览卡之间：留 16px 呼吸 */
+.reports-filter-card {
+  margin-bottom: 16px;
+}
+.reports-preview-card {
+  margin-top: 4px;
+}
+
+/* 空态引导区 */
+.reports-empty {
+  padding: 40px 16px;
+}
+.reports-empty .ant-empty-description {
+  color: #646a73;
+  font-size: 13px;
+}
