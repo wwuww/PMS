@@ -299,3 +299,64 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* ============================================================
+   M35a 表格样式统一（参考营业日报视觉）
+   - 表头浅灰 + 紧凑行高
+   - 数字列右对齐 + tabular-nums
+   - 金额色：正绿 / 负红
+   ============================================================ */
+
+/* 表头：浅灰底 + 细分割线 */
+.ant-table-wrapper .ant-table-thead > tr > th {
+  background: #f5f7fa;
+  color: #4a5260;
+  font-weight: 600;
+  font-size: 12.5px;
+  letter-spacing: 0.3px;
+  border-block-end: 1px solid #e8ebf0;
+}
+/* 紧凑行高 */
+.ant-table-wrapper .ant-table-tbody > tr > td {
+  padding: 9px 12px;
+  font-size: 13px;
+  border-block-end: 1px solid #f0f2f5;
+}
+.ant-table-wrapper .ant-table-tbody > tr:last-child > td {
+  border-block-end: none;
+}
+/* 行悬停：浅蓝底 */
+.ant-table-wrapper .ant-table-tbody > tr:hover > td {
+  background: #f7faff !important;
+}
+
+/* 数字列右对齐（列 className 用 text-right 或 is-numeric） */
+.ant-table-wrapper .ant-table-cell.text-right,
+.ant-table-wrapper .ant-table-cell.is-numeric,
+.ant-table-wrapper td.text-right,
+.ant-table-wrapper td.is-numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* 金额色：正绿 / 负红 / 默认 */
+.cell-amount-positive {
+  color: #389e0d;
+  font-weight: 500;
+}
+.cell-amount-negative {
+  color: #cf1322;
+  font-weight: 500;
+}
+.cell-amount {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* Sider 折叠态：菜单项居中，避免文字/图标溢出 */
+.ant-layout-sider-collapsed .ant-menu-item,
+.ant-layout-sider-collapsed .ant-menu-submenu-title {
+  padding-inline: 0 !important;
+  text-align: center;
+}

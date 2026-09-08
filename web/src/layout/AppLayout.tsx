@@ -38,6 +38,8 @@ import {
   CloudUploadOutlined,
   FileTextOutlined,
   SearchOutlined,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined,
 } from "@ant-design/icons";
 import { useLocation, useNavigate, useRoutes } from "react-router-dom";
 import { layoutRoutes } from "../App";
@@ -49,44 +51,63 @@ import SearchDrawer from "../components/SearchDrawer";
 
 const { Header, Sider, Content } = Layout;
 
+/**
+ * 菜单按「业务大类」归纳（M35a）。
+ * 12 个一级分组，全部带 children；顺序：前厅 → 客房 → 餐饮 → 客户 → 财务 →
+ * 价格 → 集团 → 渠道 → 智能 → 经营总览 → 基础 → 系统。
+ * 前厅置顶（最高频），经营总览居中偏后（概览类非操作入口）。
+ */
 const baseItems: MenuProps["items"] = [
-  { key: "/dashboard", icon: <DashboardOutlined />, label: "经营概览" },
-  { key: "/bookings", icon: <CalendarOutlined />, label: "预订管理" },
-  { key: "/billing", icon: <CreditCardOutlined />, label: "前台收银" },
-  { key: "/pos", icon: <CoffeeOutlined />, label: "餐饮 POS" },
-  { key: "/kds", icon: <FireOutlined />, label: "厨房出单" },
-  { key: "/complaints", icon: <CustomerServiceOutlined />, label: "投诉管理" },
-  { key: "/ar-accounts", icon: <TeamOutlined />, label: "协议挂账" },
-  { key: "/rooms", icon: <AppstoreOutlined />, label: "房态盘" },
-  { key: "/reception", icon: <DesktopOutlined />, label: "前台接待" },
-  { key: "/reception-workbench", icon: <IdcardOutlined />, label: "统一接待台" },
-  { key: "/check-in-register", icon: <IdcardOutlined />, label: "登记入住" },
-  { key: "/guests", icon: <IdcardOutlined />, label: "宾客档案" },
   {
-    key: "ops",
-    icon: <ToolOutlined />,
-    label: "运营中心",
+    key: "front-desk",
+    icon: <DesktopOutlined />,
+    label: "前厅",
     children: [
-      { key: "/nightaudit", icon: <FileDoneOutlined />, label: "夜审日报" },
-      { key: "/approvals", icon: <AuditOutlined />, label: "审批中心" },
+      { key: "/bookings", icon: <CalendarOutlined />, label: "预订管理" },
+      { key: "/billing", icon: <CreditCardOutlined />, label: "前台收银" },
+      { key: "/reception", icon: <DesktopOutlined />, label: "前台接待" },
+      { key: "/reception-workbench", icon: <IdcardOutlined />, label: "统一接待台" },
+      { key: "/check-in-register", icon: <IdcardOutlined />, label: "登记入住" },
+      { key: "/rooms", icon: <AppstoreOutlined />, label: "房态盘" },
+      { key: "/guests", icon: <IdcardOutlined />, label: "宾客档案" },
+      { key: "/complaints", icon: <CustomerServiceOutlined />, label: "投诉管理" },
+      { key: "/shifts", icon: <ReconciliationOutlined />, label: "前台交班" },
+    ],
+  },
+  {
+    key: "housekeeping-ops",
+    icon: <HomeOutlined />,
+    label: "客房运营",
+    children: [
       { key: "/housekeeping", icon: <ToolOutlined />, label: "清扫工单" },
-      { key: "/notifications", icon: <BellOutlined />, label: "通知中心" },
+      { key: "/nightaudit", icon: <FileDoneOutlined />, label: "夜审日报" },
+      { key: "/group-blocks", icon: <TeamOutlined />, label: "团队排房" },
       { key: "/wakeup", icon: <ClockCircleOutlined />, label: "叫醒服务" },
       { key: "/psb", icon: <IdcardOutlined />, label: "公安报送" },
-      { key: "/shifts", icon: <ReconciliationOutlined />, label: "前台交班" },
-      { key: "/group-blocks", icon: <TeamOutlined />, label: "团队排房" },
+    ],
+  },
+  {
+    key: "fnb",
+    icon: <CoffeeOutlined />,
+    label: "餐饮",
+    children: [
+      { key: "/pos", icon: <CoffeeOutlined />, label: "餐饮 POS" },
+      { key: "/kds", icon: <FireOutlined />, label: "厨房出单" },
     ],
   },
   {
     key: "crm",
     icon: <CrownOutlined />,
-    label: "客户关系",
-    children: [{ key: "/members", icon: <CrownOutlined />, label: "会员管理" }],
+    label: "客户与协议",
+    children: [
+      { key: "/members", icon: <CrownOutlined />, label: "会员管理" },
+      { key: "/ar-accounts", icon: <TeamOutlined />, label: "协议挂账" },
+    ],
   },
   {
-    key: "fin",
+    key: "finance",
     icon: <MoneyCollectOutlined />,
-    label: "财务中心",
+    label: "财务",
     children: [
       { key: "/commission", icon: <MoneyCollectOutlined />, label: "佣金规则" },
       { key: "/reconciliation", icon: <ReconciliationOutlined />, label: "支付对账" },
@@ -95,35 +116,9 @@ const baseItems: MenuProps["items"] = [
     ],
   },
   {
-    key: "risk",
-    icon: <AlertOutlined />,
-    label: "风控中心",
-    children: [{ key: "/alerts", icon: <AlertOutlined />, label: "AI 预警" }],
-  },
-  {
-    key: "group",
-    icon: <ClusterOutlined />,
-    label: "集团管控",
-    children: [
-      { key: "/group", icon: <ClusterOutlined />, label: "集团驾驶舱" },
-      { key: "/price-policy", icon: <ControlOutlined />, label: "集团价策" },
-    ],
-  },
-  {
-    key: "sec",
-    icon: <SafetyCertificateOutlined />,
-    label: "安全中心",
-    children: [
-      { key: "/users", icon: <TeamOutlined />, label: "用户与角色" },
-      { key: "/audit", icon: <FileSearchOutlined />, label: "审计日志" },
-    ],
-  },
-  { key: "/analytics", icon: <BarChartOutlined />, label: "经营分析" },
-  { key: "/reports", icon: <FileTextOutlined />, label: "报表中心" },
-  {
     key: "yield",
     icon: <TagsOutlined />,
-    label: "价格收益",
+    label: "价格",
     children: [
       { key: "/rates", icon: <TagsOutlined />, label: "价格库存中心" },
       { key: "/rate-calendar", icon: <CalendarOutlined />, label: "价格日历" },
@@ -131,18 +126,18 @@ const baseItems: MenuProps["items"] = [
     ],
   },
   {
-    key: "base",
-    icon: <HomeOutlined />,
-    label: "基础数据",
+    key: "group",
+    icon: <ClusterOutlined />,
+    label: "集团",
     children: [
-      { key: "/room-types", icon: <HomeOutlined />, label: "房型管理" },
-      { key: "/rooms-inventory", icon: <KeyOutlined />, label: "房间管理" },
+      { key: "/group", icon: <ClusterOutlined />, label: "集团驾驶舱" },
+      { key: "/price-policy", icon: <ControlOutlined />, label: "集团价策" },
     ],
   },
   {
     key: "channel",
     icon: <MobileOutlined />,
-    label: "渠道与平台",
+    label: "渠道",
     children: [
       { key: "/mp-orders", icon: <MobileOutlined />, label: "移动端直订" },
       { key: "/openapi", icon: <ApiOutlined />, label: "开放平台" },
@@ -153,13 +148,60 @@ const baseItems: MenuProps["items"] = [
   {
     key: "ai",
     icon: <RobotOutlined />,
-    label: "智能客服",
-    children: [{ key: "/ai-chat", icon: <RobotOutlined />, label: "AI 客服中心" }],
+    label: "智能",
+    children: [
+      { key: "/ai-chat", icon: <RobotOutlined />, label: "AI 客服中心" },
+      { key: "/alerts", icon: <AlertOutlined />, label: "AI 预警" },
+    ],
   },
-  { key: "/tenants", icon: <BankOutlined />, label: "门店管理" },
+  {
+    key: "overview",
+    icon: <DashboardOutlined />,
+    label: "经营总览",
+    children: [
+      { key: "/dashboard", icon: <DashboardOutlined />, label: "经营概览" },
+      { key: "/analytics", icon: <BarChartOutlined />, label: "经营分析" },
+      { key: "/reports", icon: <FileTextOutlined />, label: "报表中心" },
+    ],
+  },
+  {
+    key: "base",
+    icon: <BankOutlined />,
+    label: "基础数据",
+    children: [
+      { key: "/room-types", icon: <HomeOutlined />, label: "房型管理" },
+      { key: "/rooms-inventory", icon: <KeyOutlined />, label: "房间管理" },
+      { key: "/tenants", icon: <BankOutlined />, label: "门店管理" },
+    ],
+  },
+  {
+    key: "system",
+    icon: <SafetyCertificateOutlined />,
+    label: "系统",
+    children: [
+      { key: "/users", icon: <TeamOutlined />, label: "用户与角色" },
+      { key: "/audit", icon: <FileSearchOutlined />, label: "审计日志" },
+      { key: "/approvals", icon: <AuditOutlined />, label: "审批中心" },
+      { key: "/notifications", icon: <BellOutlined />, label: "通知中心" },
+    ],
+  },
 ];
 
-const GROUP_KEYS = ["ops", "crm", "fin", "risk", "group", "sec", "yield", "channel", "ai", "base"];
+/** 一级分组 key（用于 onClick 拦截：点击分组标题不跳转） */
+const GROUP_KEYS = [
+  "front-desk",
+  "housekeeping-ops",
+  "fnb",
+  "crm",
+  "finance",
+  "yield",
+  "group",
+  "channel",
+  "ai",
+  "overview",
+  "base",
+  "system",
+];
 
 /** 菜单 key（路径）→ 页面名，供选项卡标签使用 */
 const PATH_LABELS: Record<string, string> = (() => {
@@ -205,23 +247,46 @@ function buildItems(unread: number): MenuProps["items"] {
   return inject(baseItems);
 }
 
+/**
+ * 路径精确命中某一路由段（避免 /rooms 误吞 /rooms-inventory、/group 误吞 /group-blocks）。
+ * @param path 当前 location.pathname
+ * @param seg 路由段，例如 "/rooms"
+ */
+function hit(path: string, seg: string): boolean {
+  return path === seg || path.startsWith(`${seg}/`);
+}
+
+/** 当前路径所属的业务大类（决定菜单默认展开哪一个分组） */
 function parentKey(path: string): string | undefined {
-  if (path.startsWith("/nightaudit") || path.startsWith("/approvals") ||
-      path.startsWith("/housekeeping") ||       path.startsWith("/notifications") ||
-      path.startsWith("/wakeup") || path.startsWith("/psb") ||
-      path.startsWith("/shifts") || path.startsWith("/group-blocks")) return "ops";
-  if (path.startsWith("/members")) return "crm";
-  if (path.startsWith("/commission") || path.startsWith("/reconciliation") || path.startsWith("/deposits")) return "fin";
-  if (path.startsWith("/alerts")) return "risk";
-  if (path.startsWith("/group")) return "group";
-  if (path.startsWith("/users") || path.startsWith("/audit")) return "sec";
-  if (path.startsWith("/rates") || path.startsWith("/yield")) return "yield";
-  if (path.startsWith("/mp-orders") || path.startsWith("/openapi")) return "channel";
-  if (path.startsWith("/ai-chat")) return "ai";
-  if (path.startsWith("/room-types") || path.startsWith("/rooms-inventory")) return "base";
-  if (path.startsWith("/adjustments")) return "fin";
-  if (path.startsWith("/price-policy")) return "group";
-  if (path.startsWith("/channel-push") || path.startsWith("/channel-center")) return "channel";
+  if (
+    hit(path, "/bookings") || hit(path, "/billing") || hit(path, "/reception") ||
+    hit(path, "/reception-workbench") || hit(path, "/check-in-register") ||
+    hit(path, "/rooms") || hit(path, "/guests") || hit(path, "/complaints") ||
+    hit(path, "/shifts")
+  ) return "front-desk";
+  if (
+    hit(path, "/housekeeping") || hit(path, "/nightaudit") ||
+    hit(path, "/group-blocks") || hit(path, "/wakeup") || hit(path, "/psb")
+  ) return "housekeeping-ops";
+  if (hit(path, "/pos") || hit(path, "/kds")) return "fnb";
+  if (hit(path, "/members") || hit(path, "/ar-accounts")) return "crm";
+  if (
+    hit(path, "/commission") || hit(path, "/reconciliation") ||
+    hit(path, "/adjustments") || hit(path, "/deposits")
+  ) return "finance";
+  if (hit(path, "/rates") || hit(path, "/rate-calendar") || hit(path, "/yield")) return "yield";
+  if (hit(path, "/group") || hit(path, "/price-policy")) return "group";
+  if (
+    hit(path, "/mp-orders") || hit(path, "/openapi") ||
+    hit(path, "/channel-push") || hit(path, "/channel-center")
+  ) return "channel";
+  if (hit(path, "/ai-chat") || hit(path, "/alerts")) return "ai";
+  if (hit(path, "/dashboard") || hit(path, "/analytics") || hit(path, "/reports")) return "overview";
+  if (hit(path, "/room-types") || hit(path, "/rooms-inventory") || hit(path, "/tenants")) return "base";
+  if (
+    hit(path, "/users") || hit(path, "/audit") ||
+    hit(path, "/approvals") || hit(path, "/notifications")
+  ) return "system";
   return undefined;
 }
 
@@ -235,6 +300,10 @@ export default function AppLayout() {
   const [unread, setUnread] = useState(0);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  // Sider 折叠态（M35a）：收起后仅显示图标，宽度 80
+  const [collapsed, setCollapsed] = useState(false);
+  // 受控展开项：切换业务大类时自动展开对应分组；折叠时清空避免弹出层常驻
+  const [openKeys, setOpenKeys] = useState<string[]>(openKey ? [openKey] : []);
 
   const loadUnread = async () => {
     if (!tenantCode) return;
@@ -293,6 +362,15 @@ export default function AppLayout() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantCode]);
+
+  // 路由切换时展开命中的业务大类；折叠时收起全部（antd 折叠态下 openKeys 会驱动弹出层）
+  useEffect(() => {
+    if (collapsed) {
+      setOpenKeys([]);
+      return;
+    }
+    if (openKey) setOpenKeys((prev) => (prev.includes(openKey) ? prev : [...prev, openKey]));
+  }, [collapsed, openKey]);
 
   const items = useMemo(() => buildItems(unread), [unread]);
 
@@ -373,32 +451,47 @@ export default function AppLayout() {
 
   return (
     <Layout style={{ minHeight: "100vh" }}>
-      <Sider theme="dark" width={208}>
+      <Sider
+        theme="dark"
+        width={208}
+        collapsedWidth={80}
+        collapsible
+        collapsed={collapsed}
+        onCollapse={setCollapsed}
+        trigger={null}
+        breakpoint="lg"
+      >
+        {/* Logo 区：折叠态只保留渐变方块 */}
         <div
           style={{
             color: "#fff",
-            padding: "18px 16px 16px",
+            padding: collapsed ? "18px 16px" : "18px 16px 16px",
             borderBottom: "1px solid rgba(255,255,255,.08)",
             marginBottom: 4,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: collapsed ? "center" : "flex-start",
+            gap: 10,
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div
-              style={{
-                width: 30,
-                height: 30,
-                borderRadius: 8,
-                background: "linear-gradient(135deg, #1677ff 0%, #69b1ff 100%)",
-                display: "grid",
-                placeItems: "center",
-                fontWeight: 700,
-                fontSize: 14,
-                color: "#fff",
-                boxShadow: "0 2px 8px rgba(22,119,255,.5)",
-              }}
-            >
-              P
-            </div>
+          <div
+            style={{
+              width: 30,
+              height: 30,
+              borderRadius: 8,
+              background: "linear-gradient(135deg, #1677ff 0%, #69b1ff 100%)",
+              display: "grid",
+              placeItems: "center",
+              fontWeight: 700,
+              fontSize: 14,
+              color: "#fff",
+              boxShadow: "0 2px 8px rgba(22,119,255,.5)",
+              flexShrink: 0,
+            }}
+          >
+            P
+          </div>
+          {!collapsed && (
             <div>
               <div
                 style={{
@@ -421,19 +514,45 @@ export default function AppLayout() {
                 酒店集团经营中台
               </div>
             </div>
-          </div>
+          )}
         </div>
         <Menu
           theme="dark"
           mode="inline"
           selectedKeys={[location.pathname]}
-          defaultOpenKeys={openKey ? [openKey] : []}
+          openKeys={openKeys}
+          onOpenChange={(keys) => setOpenKeys(keys as string[])}
           items={items}
           onClick={({ key }) => {
             if (!GROUP_KEYS.includes(key as string)) navigate(key as string);
           }}
         />
       </Sider>
+      {/* 自定义折叠按钮：固定在 Sider 右边缘（隐藏 antd 默认 trigger，避免双按钮） */}
+      <Button
+        type="text"
+        icon={
+          collapsed ? (
+            <MenuUnfoldOutlined style={{ color: "#fff", fontSize: 16 }} />
+          ) : (
+            <MenuFoldOutlined style={{ color: "#fff", fontSize: 14 }} />
+          )
+        }
+        onClick={() => setCollapsed((v) => !v)}
+        title={collapsed ? "展开菜单" : "收起菜单"}
+        style={{
+          position: "fixed",
+          left: collapsed ? 80 : 180,
+          top: 76,
+          zIndex: 100,
+          width: 28,
+          height: 28,
+          padding: 0,
+          background: "rgba(22,119,255,0.85)",
+          borderRadius: "0 8px 8px 0",
+          transition: "left 0.2s ease",
+        }}
+      />
       <Layout>
         <Header
           style={{
