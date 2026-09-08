@@ -198,14 +198,19 @@ class YieldService:
         tenant_id: str,
         hotel_id: int | None = None,
         business_date: str | None = None,
-        limit: int = 50,
+        limit: int = 5000,
+        offset: int = 0,
     ) -> list[PriceRecommendation]:
+        """调价建议快照列表（M32 性能护栏：Paged limit/offset，默认 5000 兼容既有全量拉取）。
+
+        调方可通过 ``?limit=N&offset=M`` 走标准分页。
+        """
         stmt = select(PriceRecommendation).where(PriceRecommendation.tenant_id == tenant_id)
         if hotel_id is not None:
             stmt = stmt.where(PriceRecommendation.hotel_id == hotel_id)
         if business_date is not None:
             stmt = stmt.where(PriceRecommendation.business_date == business_date)
-        stmt = stmt.order_by(PriceRecommendation.id.desc()).limit(limit)
+        stmt = stmt.order_by(PriceRecommendation.id.desc()).limit(limit).offset(offset)
         result = await self.session.execute(stmt)
         return list(result.scalars())
 

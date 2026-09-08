@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, time, timedelta
+import logging
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.room_state import RoomTrigger
@@ -14,13 +15,34 @@ from app.models import HousekeepingTask, Room
 from app.services.notification_service import NotificationService
 from app.services.room_service import RoomService
 
+logger = logging.getLogger(__name__)
+
 TASK_TYPES = ("CLEANUP", "MAINTENANCE", "INSPECT")
+
+# M32 staff_performance 聚合护栏：单店聚合上限。极端大数据集下应拆分多次聚合，
+# 当 done_count 越界时打 warning 提示管理员数据未完全覆盖（避免聚合耗时失控）。
+STAFF_PERF_AGG_LIMIT = 5000
 
 
 def _as_utc(dt: datetime | None) -> datetime | None:
     if dt is None:
         return None
     return dt.replace(tzinfo=UTC) if dt.tzinfo is None else dt.astimezone(UTC)
+
+
+def _start_dt(d: str | None) -> datetime | None:
+    """YYYY-MM-DD → UTC 00:00:00 含当天起。"""
+    if not d:
+        return None
+    return datetime.combine(date.fromisoformat(d), time.min, tzinfo=UTC)
+
+
+def _end_dt(d: str | None) -> datetime | None:
+    """YYYY-MM-DD → UTC 次日 00:00:00（exclusive，含 end 当天全天）。"""
+    if not d:
+        return None
+    end_day = date.fromisoformat(d) + timedelta(days=1)
+    return datetime.combine(end_day, time.min, tzinfo=UTC)
 
 
 class HousekeepingService:
@@ -252,21 +274,43 @@ class HousekeepingService:
         start_date: str | None = None,
         end_date: str | None = None,
     ) -> dict:
-        """员工清扫绩效（M26，验收 #28）：完成单数 / 平均耗时（分钟）。"""
+        """员工清扫绩效（M26，验收 #28）：完成单数 / 平均耗时（分钟）。
+
+        M32 SQL 下推优化：
+            - 原版拉全部 DONE 工单后 Python 端按 ``start_date/end_date`` 过滤再按
+              staff 聚合；高基数据下内存峰值与全表扫描都成问题。
+            - 现版把日期范围、状态、tenant/hotel 全部下推到 SQL（含
+              ``done_at BETWEEN``），并加 ``LIMIT 5000`` 防止极端数据集拖慢聚合；
+              若真实完成数 > 5000，warning 日志提示管理员考虑分批或缩小日期窗口。
+            - Python 端聚合逻辑（``by_staff: dict``）保留不变。
+        """
         stmt = select(HousekeepingTask).where(
             HousekeepingTask.tenant_id == tenant_id,
             HousekeepingTask.hotel_id == hotel_id,
             HousekeepingTask.status == "DONE",
             HousekeepingTask.done_at.isnot(None),
         )
+        start = _start_dt(start_date)
+        end = _end_dt(end_date)
+        if start is not None:
+            stmt = stmt.where(HousekeepingTask.done_at >= start)
+        if end is not None:
+            stmt = stmt.where(HousekeepingTask.done_at < end)  # exclusive：含 end 当天全天
+        stmt = stmt.order_by(HousekeepingTask.done_at.desc()).limit(STAFF_PERF_AGG_LIMIT)
+
         rows = (await self.session.execute(stmt)).scalars().all()
+        if len(rows) >= STAFF_PERF_AGG_LIMIT:
+            logger.warning(
+                "housekeeping.staff_performance 聚合触达上限 %d 条，"
+                "可能存在数据被截断；建议缩小日期窗口或按 assignee 分批查询。"
+                " tenant=%s hotel=%s",
+                STAFF_PERF_AGG_LIMIT,
+                tenant_id,
+                hotel_id,
+            )
+
         by_staff: dict[str, dict] = {}
         for t in rows:
-            done_date = t.done_at.date().isoformat()
-            if start_date and done_date < start_date:
-                continue
-            if end_date and done_date > end_date:
-                continue
             key = t.assignee or "未指派"
             entry = by_staff.setdefault(
                 key, {"assignee": key, "done_count": 0, "total_minutes": 0.0}
@@ -288,21 +332,26 @@ class HousekeepingService:
             "end_date": end_date,
             "staff": staff,
             "total_done": sum(s["done_count"] for s in staff),
+            "truncated": len(rows) >= STAFF_PERF_AGG_LIMIT,
         }
 
     async def overdue_count(self, tenant_id: str, hotel_id: int) -> int:
-        """超时未完成工单数（FR-FT-04 清扫超时提醒店长，默认阈值 2h 由 due_at 承载）。"""
-        rows = await self.session.execute(
-            select(HousekeepingTask).where(
+        """超时未完成工单数（FR-FT-04 清扫超时提醒店长，默认阈值 2h 由 due_at 承载）。
+
+        M32 SQL 下推优化：直接 ``SELECT COUNT(*) WHERE status IN (...) AND
+        due_at < now()``，避免拉全部 PENDING/ASSIGNED 工单后 Python 端遍历判断。
+        ``due_at`` 字段为 ``DateTime(timezone=True)``（UTC 存储），比较用
+        ``datetime.now(UTC)`` 统一时区，避开已弃用的 ``datetime.utcnow()``。
+        """
+        result = await self.session.execute(
+            select(func.count())
+            .select_from(HousekeepingTask)
+            .where(
                 HousekeepingTask.tenant_id == tenant_id,
                 HousekeepingTask.hotel_id == hotel_id,
                 HousekeepingTask.status.in_(["PENDING", "ASSIGNED"]),
+                HousekeepingTask.due_at.isnot(None),
+                HousekeepingTask.due_at < datetime.now(UTC),
             )
         )
-        now = datetime.now(UTC)
-        n = 0
-        for t in rows.scalars():
-            due = _as_utc(t.due_at)
-            if due is not None and due < now:
-                n += 1
-        return n
+        return int(result.scalar() or 0)

@@ -327,6 +327,7 @@ from app.services.audit_service import record as audit_service_record
 from app.services.audit_service import record as audit_service_record
 from app.services.complaint_service import ComplaintService
 from app.services.fnb_service import PosService
+from app.api.dependencies import MAX_LIST_ROWS, Paged
 from app.services.ota_service import OtaError, OtaService, SIGN_HEADER
 from app.services.ota_mapping_service import OtaMappingError, OtaMappingService
 from app.services.ota_rate_plan_service import OtaRatePlanError, OtaRatePlanService
@@ -424,7 +425,8 @@ async def require_auth(
 # M30：列表接口安全护栏——单次返回行数硬上限，防止全表拉取拖垮实例。
 # 默认（limit=None）语义仍是「不额外限制」以兼容既有前端全量拉取，但无论如何
 # 不会超过此值；需要精确分页的调用方显式传 limit/offset。
-MAX_LIST_ROWS = 5000
+# 常量定义已迁出至 ``app.api.dependencies``（M32 抽公共依赖），routes.py 仅保留
+# ``from app.api.dependencies import MAX_LIST_ROWS, Paged`` 供既有 6 个端点继续使用。
 
 
 async def require_perm(
@@ -928,9 +930,16 @@ async def list_price_calendar(
     room_type_id: int | None = None,
     start: str | None = None,
     end: str | None = None,
+    paging: tuple[int, int] = Depends(Paged),
     session: AsyncSession = Depends(get_session),
 ) -> list[PriceCalendar]:
-    """按租户/房型/日期范围查询价格日历（日历视图数据源）。"""
+    """按租户/房型/日期范围查询价格日历（日历视图数据源 + M32 性能护栏）。
+
+    - 默认按 (room_type_id, date) 升序输出（日历视图需要稳定顺序）；
+    - Paged 默认 limit=5000 兼容既有按月全量拉取；
+    - 显式传 ``?limit=N&offset=M`` 走标准分页。
+    """
+    limit, offset = paging
     q = select(PriceCalendar).where(PriceCalendar.tenant_id == tenant_id)
     if room_type_id is not None:
         q = q.where(PriceCalendar.room_type_id == room_type_id)
@@ -938,7 +947,9 @@ async def list_price_calendar(
         q = q.where(PriceCalendar.date >= start)
     if end:
         q = q.where(PriceCalendar.date <= end)
-    q = q.order_by(PriceCalendar.room_type_id, PriceCalendar.date)
+    q = q.order_by(
+        PriceCalendar.date.asc(), PriceCalendar.room_type_id.asc()
+    ).limit(limit).offset(offset)
     rows = (await session.execute(q)).scalars().all()
     return list(rows)
 
@@ -1404,10 +1415,13 @@ async def create_group_block(
 async def list_group_blocks(
     tenant_id: str,
     hotel_id: int | None = None,
+    paging: tuple[int, int] = Depends(Paged),
     session: AsyncSession = Depends(get_session),
 ) -> list[GroupBlock]:
+    """团队排房列表（M32 性能护栏：Paged limit/offset 透传 GroupBlockService.list_blocks）。"""
+    limit, offset = paging
     svc = GroupBlockService(session)
-    blocks = await svc.list_blocks(tenant_id, hotel_id=hotel_id)
+    blocks = await svc.list_blocks(tenant_id, hotel_id=hotel_id, limit=limit, offset=offset)
     return [await _group_block_out(session, b) for b in blocks]
 
 
@@ -2028,11 +2042,16 @@ async def run_night_audit(
 async def list_business_days(
     tenant_id: str,
     hotel_id: int | None = None,
+    paging: tuple[int, int] = Depends(Paged),
     session: AsyncSession = Depends(get_session),
 ) -> list[BusinessDay]:
+    """营业日列表（M32 性能护栏：Paged limit/offset + 稳定排序）。"""
+    limit, offset = paging
     stmt = select(BusinessDay).where(BusinessDay.tenant_id == tenant_id)
     if hotel_id is not None:
         stmt = stmt.where(BusinessDay.hotel_id == hotel_id)
+    # 稳定排序：分页场景下无 order_by 会出现重复/漏行
+    stmt = stmt.order_by(BusinessDay.id.desc()).limit(limit).offset(offset)
     result = await session.execute(stmt)
     return list(result.scalars())
 
@@ -2041,11 +2060,16 @@ async def list_business_days(
 async def list_daily_reports(
     tenant_id: str,
     hotel_id: int | None = None,
+    paging: tuple[int, int] = Depends(Paged),
     session: AsyncSession = Depends(get_session),
 ) -> list[DailyReport]:
+    """夜审日报列表（M32 性能护栏：Paged limit/offset + 稳定排序）。"""
+    limit, offset = paging
     stmt = select(DailyReport).where(DailyReport.tenant_id == tenant_id)
     if hotel_id is not None:
         stmt = stmt.where(DailyReport.hotel_id == hotel_id)
+    # 稳定排序：分页场景下无 order_by 会出现重复/漏行
+    stmt = stmt.order_by(DailyReport.id.desc()).limit(limit).offset(offset)
     result = await session.execute(stmt)
     return list(result.scalars())
 
@@ -2189,10 +2213,13 @@ async def close_shift(
 async def list_shifts(
     tenant_id: str,
     hotel_id: int | None = None,
+    paging: tuple[int, int] = Depends(Paged),
     session: AsyncSession = Depends(get_session),
 ) -> list[ShiftHandover]:
+    """交班记录列表（M32 性能护栏：Paged limit/offset 透传 ShiftService.list_shifts）。"""
+    limit, offset = paging
     svc = ShiftService(session)
-    return await svc.list_shifts(tenant_id, hotel_id)
+    return await svc.list_shifts(tenant_id, hotel_id, limit=limit, offset=offset)
 
 
 # ---------- 叫醒服务（M3-7） ----------
@@ -3324,10 +3351,14 @@ async def list_alerts(
     tenant_id: str,
     hotel_id: int | None = None,
     status: str | None = None,
+    paging: tuple[int, int] = Depends(Paged),
     session: AsyncSession = Depends(get_session),
 ) -> list[AlertNotification]:
-    """M12：AI 自动对账预警列表。"""
-    return await AnomalyService(session).list_alerts(tenant_id, hotel_id=hotel_id, status=status)
+    """M12：AI 自动对账预警列表（M32 性能护栏：Paged limit/offset 透传 AnomalyService.list_alerts）。"""
+    limit, offset = paging
+    return await AnomalyService(session).list_alerts(
+        tenant_id, hotel_id=hotel_id, status=status, limit=limit, offset=offset
+    )
 
 
 @router.post("/tenants/{tenant_id}/ai/alerts/{alert_id}/acknowledge", response_model=AlertNotificationOut)
@@ -3701,14 +3732,22 @@ async def openapi_read_hotels(
 )
 async def openapi_read_rooms(
     hotel_id: int,
+    paging: tuple[int, int] = Depends(Paged),
     app: OpenApiApp = Depends(require_api_key),
     session: AsyncSession = Depends(get_session),
 ) -> list[Room]:
-    """M18：第三方读取某门店房间与房态。"""
+    """M18：第三方读取某门店房间与房态（M32 性能护栏：Paged limit/offset）。"""
+    limit, offset = paging
     hotel = await session.get(Hotel, hotel_id)
     if not hotel or hotel.tenant_id != app.tenant_id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "门店不存在")
-    result = await session.execute(select(Room).where(Room.hotel_id == hotel_id))
+    result = await session.execute(
+        select(Room)
+        .where(Room.hotel_id == hotel_id)
+        .order_by(Room.id.asc())
+        .limit(limit)
+        .offset(offset)
+    )
     return list(result.scalars())
 
 
@@ -3740,13 +3779,16 @@ async def openapi_read_availability(
 )
 async def openapi_read_bookings(
     status_: str | None = None,
+    paging: tuple[int, int] = Depends(Paged),
     app: OpenApiApp = Depends(require_api_key),
     session: AsyncSession = Depends(get_session),
 ) -> list[Booking]:
-    """M18：第三方读取预订列表（可按状态过滤）。"""
+    """M18：第三方读取预订列表（可按状态过滤 + M32 性能护栏：Paged limit/offset）。"""
+    limit, offset = paging
     stmt = select(Booking).where(Booking.tenant_id == app.tenant_id)
     if status_:
         stmt = stmt.where(Booking.status == status_)
+    stmt = stmt.order_by(Booking.id.desc()).limit(limit).offset(offset)
     result = await session.execute(stmt)
     return list(result.scalars())
 
@@ -3834,11 +3876,15 @@ async def list_yield_recommendations(
     tenant_id: str,
     hotel_id: int | None = None,
     business_date: str | None = None,
+    paging: tuple[int, int] = Depends(Paged),
     session: AsyncSession = Depends(get_session),
 ) -> list[PriceRecommendation]:
-    """M15：查询调价建议快照（按门店/营业日过滤）。"""
+    """M15：查询调价建议快照（按门店/营业日过滤 + M32 性能护栏：Paged limit/offset）。"""
+    limit, offset = paging
     svc = YieldService(session)
-    return await svc.list_recommendations(tenant_id, hotel_id, business_date)
+    return await svc.list_recommendations(
+        tenant_id, hotel_id, business_date, limit=limit, offset=offset
+    )
 
 
 @router.post(

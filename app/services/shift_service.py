@@ -121,9 +121,20 @@ class ShiftService:
         )
         return shift
 
-    async def list_shifts(self, tenant_id: str, hotel_id: int | None = None) -> list[ShiftHandover]:
+    async def list_shifts(
+        self,
+        tenant_id: str,
+        hotel_id: int | None = None,
+        limit: int = 5000,
+        offset: int = 0,
+    ) -> list[ShiftHandover]:
+        """交班记录列表（M32 性能护栏：Paged limit/offset，默认 5000 兼容既有全量拉取）。
+
+        按 id 倒序保持「最新班次优先」语义。
+        """
         stmt = select(ShiftHandover).where(ShiftHandover.tenant_id == tenant_id)
         if hotel_id is not None:
             stmt = stmt.where(ShiftHandover.hotel_id == hotel_id)
+        stmt = stmt.order_by(ShiftHandover.id.desc()).limit(limit).offset(offset)
         rows = await self.session.execute(stmt)
         return list(rows.scalars())

@@ -60,12 +60,17 @@ class GroupBlockService:
         return block
 
     async def list_blocks(
-        self, tenant_id: str, hotel_id: int | None = None
+        self,
+        tenant_id: str,
+        hotel_id: int | None = None,
+        limit: int = 5000,
+        offset: int = 0,
     ) -> list[GroupBlock]:
+        """团队排房列表（M32 性能护栏：Paged limit/offset，默认 5000 兼容既有全量拉取）。"""
         stmt = select(GroupBlock).where(GroupBlock.tenant_id == tenant_id)
         if hotel_id is not None:
             stmt = stmt.where(GroupBlock.hotel_id == hotel_id)
-        stmt = stmt.order_by(GroupBlock.id.desc())
+        stmt = stmt.order_by(GroupBlock.id.desc()).limit(limit).offset(offset)
         rows = (await self.session.execute(stmt)).scalars().all()
         return list(rows)
 

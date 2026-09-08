@@ -224,13 +224,20 @@ class AnomalyService:
         hotel_id: int | None = None,
         status: str | None = None,
         limit: int = 100,
+        offset: int = 0,
     ) -> list[AlertNotification]:
+        """M12：预警列表（M32 性能护栏：Paged limit/offset）。
+
+        - 默认 limit=100 与既有行为一致，offset=0；
+        - routes 层通过 ``Paged`` 依赖注入时 ``limit`` 取 Paged 默认 5000；
+        - 调方需精确控制展示条数时可显式覆盖 ``limit``。
+        """
         stmt = select(AlertNotification).where(AlertNotification.tenant_id == tenant_id)
         if hotel_id is not None:
             stmt = stmt.where(AlertNotification.hotel_id == hotel_id)
         if status:
             stmt = stmt.where(AlertNotification.status == status)
-        stmt = stmt.order_by(AlertNotification.id.desc()).limit(limit)
+        stmt = stmt.order_by(AlertNotification.id.desc()).limit(limit).offset(offset)
         rows = await self.session.execute(stmt)
         return list(rows.scalars())
 
