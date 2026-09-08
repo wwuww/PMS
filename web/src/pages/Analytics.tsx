@@ -42,6 +42,9 @@ import type {
   CustomReport,
 } from "../api/types";
 import { fmtCents, fmtBps, fmtInt } from "../utils/format";
+// M35b：金额/比率单元格组件（正数绿色、负数红色、等宽数字）
+// 注意：必须带 .tsx 后缀 —— 无后缀会优先解析到 format.ts（纯字符串工具），取不到组件。
+import { CellAmount, CellPct } from "../utils/format.tsx";
 
 const { Text } = Typography;
 
@@ -204,11 +207,11 @@ export default function AnalyticsPage() {
               pagination={false}
               columns={[
                 { title: "门店", dataIndex: "name" },
-                { title: "房费收入", dataIndex: "room_revenue_cents", align: "right", render: (v: number) => fmtCents(v) },
-                { title: "总营收", dataIndex: "total_revenue_cents", align: "right", render: (v: number) => fmtCents(v) },
-                { title: "RevPAR", dataIndex: "revpar_cents", align: "right", render: (v: number) => fmtCents(v) },
-                { title: "ADR", dataIndex: "adr_cents", align: "right", render: (v: number) => fmtCents(v) },
-                { title: "出租率", dataIndex: "occ_pct_bps", align: "right", render: (v: number) => fmtBps(v) },
+                { title: "房费收入", dataIndex: "room_revenue_cents", align: "right", render: (v: number) => <CellAmount value={v} /> },
+                { title: "总营收", dataIndex: "total_revenue_cents", align: "right", render: (v: number) => <CellAmount value={v} /> },
+                { title: "RevPAR", dataIndex: "revpar_cents", align: "right", render: (v: number) => <CellAmount value={v} /> },
+                { title: "ADR", dataIndex: "adr_cents", align: "right", render: (v: number) => <CellAmount value={v} /> },
+                { title: "出租率", dataIndex: "occ_pct_bps", align: "right", render: (v: number) => <CellPct value={v} /> },
               ]}
               dataSource={ranking.hotels}
             />
@@ -230,7 +233,7 @@ export default function AnalyticsPage() {
               columns={[
                 { title: "渠道", dataIndex: "channel" },
                 { title: "预订数", dataIndex: "booking_count", align: "right" },
-                { title: "房费收入", dataIndex: "room_revenue_cents", align: "right", render: (v: number) => fmtCents(v) },
+                { title: "房费收入", dataIndex: "room_revenue_cents", align: "right", render: (v: number) => <CellAmount value={v} /> },
               ]}
               dataSource={channel.channels}
               footer={() => `合计：预订 ${channel.total_bookings} 笔 / 房费 ${fmtCents(channel.total_room_revenue_cents)}`}
@@ -253,7 +256,7 @@ export default function AnalyticsPage() {
               columns={[
                 { title: "房型", dataIndex: "room_type_name" },
                 { title: "预订数", dataIndex: "booking_count", align: "right" },
-                { title: "房费收入", dataIndex: "room_revenue_cents", align: "right", render: (v: number) => fmtCents(v) },
+                { title: "房费收入", dataIndex: "room_revenue_cents", align: "right", render: (v: number) => <CellAmount value={v} /> },
               ]}
               dataSource={roomType.room_types}
               footer={() => `合计：预订 ${roomType.total_bookings} 笔 / 房费 ${fmtCents(roomType.total_room_revenue_cents)}`}
@@ -275,7 +278,7 @@ export default function AnalyticsPage() {
               pagination={false}
               columns={[
                 { title: "支付方式", dataIndex: "method" },
-                { title: "金额", dataIndex: "amount_cents", align: "right", render: (v: number) => fmtCents(v) },
+                { title: "金额", dataIndex: "amount_cents", align: "right", render: (v: number) => <CellAmount value={v} /> },
               ]}
               dataSource={payment.methods}
               footer={() => `合计：${fmtCents(payment.total_cents)}`}
@@ -401,7 +404,7 @@ export default function AnalyticsPage() {
                   render: (v: string, r: { label?: string }) => r.label || v,
                 },
                 { title: "预订数", dataIndex: "booking_count", align: "right" },
-                { title: "房费收入", dataIndex: "room_revenue_cents", align: "right", render: (v: number) => fmtCents(v) },
+                { title: "房费收入", dataIndex: "room_revenue_cents", align: "right", render: (v: number) => <CellAmount value={v} /> },
               ]}
               dataSource={custom.rows}
               footer={() => `合计：预订 ${custom.total_bookings} 笔 / 房费 ${fmtCents(custom.total_room_revenue_cents)}`}

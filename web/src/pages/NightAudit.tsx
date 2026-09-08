@@ -24,6 +24,9 @@ import { useTenant } from "../store/tenant";
 import { listDailyReports, listBusinessDays, runNightAudit } from "../api/endpoints";
 import type { DailyReport, BusinessDay } from "../api/types";
 import { fmtCents, fmtInt } from "../utils/format";
+// M35b：金额单元格组件（正数绿色、负数红色、等宽数字）
+// 注意：必须带 .tsx 后缀 —— 无后缀会优先解析到 format.ts（纯字符串工具），取不到组件。
+import { CellAmount } from "../utils/format.tsx";
 
 const { Title, Text } = Typography;
 
@@ -274,28 +277,32 @@ export default function NightAuditPage() {
       dataIndex: "room_revenue",
       key: "room_revenue",
       align: "right",
-      render: (v: number) => fmtCents(v),
+      render: (v: number) => <CellAmount value={v} />,
     },
     {
       title: "其他收入",
       dataIndex: "other_revenue",
       key: "other_revenue",
       align: "right",
-      render: (v: number) => fmtCents(v),
+      render: (v: number) => <CellAmount value={v} />,
     },
     {
       title: "总收入",
       dataIndex: "total_revenue",
       key: "total_revenue",
       align: "right",
-      render: (v: number) => <Text strong>{fmtCents(v)}</Text>,
+      render: (v: number) => (
+        <Text strong>
+          <CellAmount value={v} />
+        </Text>
+      ),
     },
     {
       title: "ADR",
       dataIndex: "adr",
       key: "adr",
       align: "right",
-      render: (v: number) => fmtCents(v),
+      render: (v: number) => <CellAmount value={v} />,
     },
     {
       title: "抵店/离店",

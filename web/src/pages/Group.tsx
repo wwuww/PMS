@@ -14,7 +14,9 @@ import type { ColumnsType } from "antd/es/table";
 import { useTenant } from "../store/tenant";
 import { groupDashboard, groupSettlement } from "../api/endpoints";
 import type { HqDashboard, Settlement, SettlementRow } from "../api/types";
-import { fmtCents } from "../utils/format";
+// M35b：金额单元格组件（正数绿色、负数红色、等宽数字）
+// 注意：必须带 .tsx 后缀 —— 无后缀会优先解析到 format.ts（纯字符串工具），取不到组件。
+import { CellAmount } from "../utils/format.tsx";
 
 const { Title, Text } = Typography;
 
@@ -52,19 +54,23 @@ export default function GroupPage() {
       title: "现付（CASH/银联）",
       dataIndex: "pay_now_cents",
       align: "right",
-      render: (v: number) => fmtCents(v),
+      render: (v: number) => <CellAmount value={v} />,
     },
     {
       title: "预付（微信/支付宝/储值）",
       dataIndex: "prepaid_cents",
       align: "right",
-      render: (v: number) => fmtCents(v),
+      render: (v: number) => <CellAmount value={v} />,
     },
     {
       title: "合计",
       dataIndex: "total_cents",
       align: "right",
-      render: (v: number) => <Text strong>{fmtCents(v)}</Text>,
+      render: (v: number) => (
+        <Text strong>
+          <CellAmount value={v} />
+        </Text>
+      ),
     },
   ];
 
@@ -102,19 +108,19 @@ export default function GroupPage() {
                 title: "房费收入",
                 dataIndex: "room_revenue",
                 align: "right",
-                render: (v: number) => fmtCents(v),
+                render: (v: number) => <CellAmount value={v} />,
               },
               {
                 title: "总营收",
                 dataIndex: "total_revenue",
                 align: "right",
-                render: (v: number) => fmtCents(v),
+                render: (v: number) => <CellAmount value={v} />,
               },
               {
                 title: "RevPAR",
                 dataIndex: "revpar",
                 align: "right",
-                render: (v: number) => fmtCents(v),
+                render: (v: number) => <CellAmount value={v} />,
               },
               {
                 title: "出租率",

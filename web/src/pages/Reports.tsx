@@ -28,6 +28,9 @@ import { useSearchParams } from "react-router-dom";
 import { useTenant } from "../store/tenant";
 import { exportReport } from "../api/endpoints";
 import { fmtBps, fmtCents } from "../utils/format";
+// M35b：金额/比率/整数单元格组件（正绿负红 + 等宽数字）
+// 注意：必须带 .tsx 后缀 —— 无后缀会优先解析到 format.ts（纯字符串工具），取不到组件。
+import { CellAmount, CellInt, CellPct } from "../utils/format.tsx";
 import type { ReportExport, ReportType } from "../api/types";
 import StatCard from "../components/StatCard";
 import "./Reports.css";
@@ -43,6 +46,27 @@ const RTYPES: { value: ReportType; label: string; needHotel: boolean }[] = [
 ];
 
 type Row = Record<string, unknown>;
+
+/**
+ * M35b：动态报表列的「金额 / 比率」判定。
+ *
+ * 报表列名来自后端 collectKeys（英文 snake_case 字段名），因此这里用**确定性后缀规则**
+ * 而不是中文关键词猜测，避免把「天数 / 预订数 / 房晚」这类计数列误染成绿色：
+ *   - *_cents / *_amount / *_fee / *_price 以及 revpar / adr 等 → 金额（正绿负红）
+ *   - *_bps（基点）                                            → 比率（正绿负红）
+ *   - 其余数字列                                                → 仅等宽数字，不染色
+ */
+const MONEY_KEY_RE = /(_cents|_amount|_fee|_price)$/;
+const MONEY_KEYS = new Set(["revpar", "adr", "amount", "balance", "deposit"]);
+const PCT_KEY_RE = /(_bps|_pct_bps)$/;
+
+function isMoneyKey(key: string): boolean {
+  return MONEY_KEY_RE.test(key) || MONEY_KEYS.has(key);
+}
+
+function isPctKey(key: string): boolean {
+  return PCT_KEY_RE.test(key);
+}
 
 function collectKeys(rows: Row[]): string[] {
   const set = new Set<string>();
@@ -163,12 +187,12 @@ export default function Reports() {
         dataIndex: k,
         key: k,
         align: isNum ? ("right" as const) : ("left" as const),
-        render: (val: unknown) =>
-          typeof val === "number"
-            ? val.toLocaleString("zh-CN")
-            : val == null
-            ? "—"
-            : String(val),
+        render: (val: unknown) => {
+          if (typeof val !== "number") return val == null ? "—" : String(val);
+          if (isMoneyKey(k)) return <CellAmount value={val} />;
+          if (isPctKey(k)) return <CellPct value={val} />;
+          return <CellInt value={val} />;
+        },
       };
     });
   }, [rows]);
