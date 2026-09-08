@@ -22,6 +22,8 @@ dev = [
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+# 硬排除 perf marker（造规模数据耗时 + 复用 _perf.db 与当前迁移漂移）—— 性能基线需显式 `pytest -m perf tests/test_perf_baseline.py` 才跑
+addopts = "-m 'not perf'"
 markers = [
     "auth: 跳过测试态鉴权旁路，用于验证鉴权本身（401/403）",
     "perf: 性能基线/压测（造规模数据，耗时较长；默认不进 CI，需显式 -m perf）",

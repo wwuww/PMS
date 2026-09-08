@@ -60,6 +60,9 @@ async def seeded(monkeypatch) -> dict[str, Any]:  # noqa: ANN001
     """造规模数据（幂等：已存在则复用，避免每次重建拖慢迭代）。
 
     使用独立 ``_perf.db``（已 gitignore）承载压测数据，避免污染开发库 pms_dev.db。
+
+    M30 第二批：旧 _perf.db 与新迁移漂移时（模型加列），自动删旧库重建保证 schema 最新，
+    避免「旧库 + create_all 只建新表」导致 OperationalError。
     """
     from sqlalchemy import select
     from sqlalchemy.ext.asyncio import async_sessionmaker
@@ -69,6 +72,16 @@ async def seeded(monkeypatch) -> dict[str, Any]:  # noqa: ANN001
     from app.models import Booking, Hotel, Room, RoomType, Tenant
 
     perf_db = Path(__file__).resolve().parents[1] / "_perf.db"
+    # M30 第二批：检测到 _perf.db 比最近的迁移文件旧时，删旧库让 init_db 重建（避免 schema 漂移）
+    latest_migration = max(
+        (Path(__file__).resolve().parents[1] / "migrations" / "versions").glob("*.py"),
+        default=None,
+        key=lambda p: p.stat().st_mtime,
+    )
+    if perf_db.exists() and latest_migration is not None:
+        if perf_db.stat().st_mtime < latest_migration.stat().st_mtime:
+            perf_db.unlink()
+            print(f"[perf fixture] 检测到 _perf.db 比最新迁移旧，已删除重建（migration={latest_migration.name}）")
     monkeypatch.setenv("PMS_DATABASE_URL", f"sqlite+aiosqlite:///{perf_db.as_posix()}")
     get_settings.cache_clear()
     db_session.reset_engine()
