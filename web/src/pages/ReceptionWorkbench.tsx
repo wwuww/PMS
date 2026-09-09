@@ -22,9 +22,16 @@ import {
 } from "antd";
 import {
   CheckCircleOutlined,
+  ClearOutlined,
+  CreditCardOutlined,
+  DollarOutlined,
+  HomeOutlined,
   IdcardOutlined,
   ReloadOutlined,
   SwapOutlined,
+  TeamOutlined,
+  TrophyOutlined,
+  WalletOutlined,
 } from "@ant-design/icons";
 import dayjs, { type Dayjs } from "dayjs";
 import {
@@ -46,9 +53,10 @@ import type {
 } from "../api/types";
 import { useTenant } from "../store/tenant";
 import { ROOM_STATE_LABELS } from "../domain/roomActions";
-
-/** 分 → 元。 */
-const yuan = (cents: number) => `¥${(cents / 100).toFixed(2)}`;
+import { fmtCents, fmtInt } from "../utils/format";
+// 必须带 .tsx 后缀：无后缀会优先解析到 format.ts（纯字符串工具），取不到组件。
+import { CellAmount } from "../utils/format.tsx";
+import StatCard from "../components/StatCard";
 
 /** 办理流阶段（对齐 PRD 状态机流水线）。 */
 const FLOW_STAGES: { key: string; label: string }[] = [
@@ -150,6 +158,17 @@ export default function ReceptionWorkbenchPage() {
   const rtName = (id: number | string | null | undefined) =>
     id == null ? "—" : roomTypes.find((x) => x.id === String(id))?.name ?? `#${id}`;
 
+  // 顶部房态概览（数据取自本页已加载的 rooms，未新增接口）
+  const roomOverview = useMemo(() => {
+    const count = (states: string[]) => rooms.filter((r) => states.includes(r.state)).length;
+    return {
+      total: rooms.length,
+      assignable: assignableRooms.length,
+      occupied: count(["occupied"]),
+      dirty: count(["vacant_dirty"]),
+    };
+  }, [rooms, assignableRooms]);
+
   const currentStep = ctx ? FLOW_STAGES.findIndex((s) => s.key === ctx.flow_state) : -1;
 
   const openAction = (a: ReceptionAction) => {
@@ -248,14 +267,71 @@ export default function ReceptionWorkbenchPage() {
 
   return (
     <div>
-      <Space style={{ marginBottom: 12, width: "100%", justifyContent: "space-between" }} wrap>
-        <Typography.Title level={4} style={{ margin: 0 }}>
-          统一接待办理工作台
-        </Typography.Title>
-        <Button icon={<ReloadOutlined />} onClick={runQuery} loading={loading}>
-          重新查询
-        </Button>
-      </Space>
+      {/* 页头：对齐 Dashboard / Reports（标题 + 副标题 + 工具条） */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-end",
+          marginBottom: 16,
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        <div>
+          <Typography.Title level={4} style={{ margin: 0, marginBottom: 4 }}>
+            统一接待办理工作台
+          </Typography.Title>
+          <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+            查档 → 建档 → 入住 → 在住 → 结账 → 退房
+          </Typography.Text>
+        </div>
+        <Space>
+          <Button icon={<ReloadOutlined />} onClick={runQuery} loading={loading}>
+            重新查询
+          </Button>
+        </Space>
+      </div>
+
+      {/* 顶部概览：房态关键数字（StatCard 基线） */}
+      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+        <Col xs={12} sm={12} md={6}>
+          <StatCard
+            label="总房数"
+            value={roomOverview.total}
+            sub="本门店房间总量"
+            accent="#1677ff"
+            icon={<HomeOutlined />}
+          />
+        </Col>
+        <Col xs={12} sm={12} md={6}>
+          <StatCard
+            label="可排房"
+            value={roomOverview.assignable}
+            sub="空净 / 锁房"
+            accent="#389e0d"
+            icon={<CheckCircleOutlined />}
+          />
+        </Col>
+        <Col xs={12} sm={12} md={6}>
+          <StatCard
+            label="在住"
+            value={roomOverview.occupied}
+            sub="当前占用房间"
+            accent="#13c2c2"
+            icon={<TeamOutlined />}
+          />
+        </Col>
+        <Col xs={12} sm={12} md={6}>
+          <StatCard
+            label="待清扫"
+            value={roomOverview.dirty}
+            sub="空脏房"
+            accent="#fa8c16"
+            icon={<ClearOutlined />}
+          />
+        </Col>
+      </Row>
 
       {/* 查询栏 */}
       <Card size="small" style={{ marginBottom: 16 }}>
@@ -305,6 +381,46 @@ export default function ReceptionWorkbenchPage() {
               items={FLOW_STAGES.map((s) => ({ title: s.label }))}
             />
           </Card>
+
+          {/* 单客关键数字（StatCard 基线，数据取自 ctx，未新增接口） */}
+          <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+            <Col xs={12} sm={12} md={6}>
+              <StatCard
+                label="累计消费"
+                value={ctx.guest ? fmtCents(ctx.guest.total_spend) : "—"}
+                sub={ctx.guest ? `入住 ${ctx.guest.stay_count} 次 · VIP ${ctx.guest.vip_level}` : "尚无客档"}
+                accent="#1677ff"
+                icon={<DollarOutlined />}
+              />
+            </Col>
+            <Col xs={12} sm={12} md={6}>
+              <StatCard
+                label="会员储值"
+                value={ctx.membership ? fmtCents(ctx.membership.stored_value) : "—"}
+                sub={ctx.membership ? `等级 ${ctx.membership.level}` : "未关联会员"}
+                accent="#13c2c2"
+                icon={<WalletOutlined />}
+              />
+            </Col>
+            <Col xs={12} sm={12} md={6}>
+              <StatCard
+                label="会员积分"
+                value={ctx.membership ? fmtInt(ctx.membership.points) : "—"}
+                sub={ctx.membership ? `历史入住 ${ctx.membership.stays} 次` : "未关联会员"}
+                accent="#fa8c16"
+                icon={<TrophyOutlined />}
+              />
+            </Col>
+            <Col xs={12} sm={12} md={6}>
+              <StatCard
+                label="在开账单余额"
+                value={ctx.folio ? fmtCents(ctx.folio.balance) : "—"}
+                sub={ctx.folio ? `${ctx.folio.bill_no} · ${ctx.folio.item_count} 项` : "暂无在开账单"}
+                accent="#722ed1"
+                icon={<CreditCardOutlined />}
+              />
+            </Col>
+          </Row>
 
           {/* 客史洞察（R7） */}
           {ctx.insights.length > 0 && (
@@ -388,7 +504,9 @@ export default function ReceptionWorkbenchPage() {
                     <Descriptions.Item label="手机号">{ctx.guest.phone ?? "—"}</Descriptions.Item>
                     <Descriptions.Item label="VIP">{ctx.guest.vip_level}</Descriptions.Item>
                     <Descriptions.Item label="入住次数">{ctx.guest.stay_count}</Descriptions.Item>
-                    <Descriptions.Item label="累计消费">{yuan(ctx.guest.total_spend)}</Descriptions.Item>
+                    <Descriptions.Item label="累计消费">
+                      <CellAmount value={ctx.guest.total_spend} />
+                    </Descriptions.Item>
                     {ctx.guest.member_level && (
                       <Descriptions.Item label="关联会员等级">{ctx.guest.member_level}</Descriptions.Item>
                     )}
@@ -405,7 +523,9 @@ export default function ReceptionWorkbenchPage() {
                 {ctx.membership ? (
                   <Descriptions column={1} size="small">
                     <Descriptions.Item label="等级">{ctx.membership.level}</Descriptions.Item>
-                    <Descriptions.Item label="储值">{yuan(ctx.membership.stored_value)}</Descriptions.Item>
+                    <Descriptions.Item label="储值">
+                      <CellAmount value={ctx.membership.stored_value} />
+                    </Descriptions.Item>
                     <Descriptions.Item label="积分">{ctx.membership.points}</Descriptions.Item>
                     <Descriptions.Item label="入住次数">{ctx.membership.stays}</Descriptions.Item>
                   </Descriptions>
@@ -454,7 +574,9 @@ export default function ReceptionWorkbenchPage() {
                 {ctx.folio ? (
                   <Descriptions column={1} size="small">
                     <Descriptions.Item label="账单号">{ctx.folio.bill_no}</Descriptions.Item>
-                    <Descriptions.Item label="余额">{yuan(ctx.folio.balance)}</Descriptions.Item>
+                    <Descriptions.Item label="余额">
+                      <CellAmount value={ctx.folio.balance} />
+                    </Descriptions.Item>
                     <Descriptions.Item label="笔数">{ctx.folio.item_count} 项 / {ctx.folio.payment_count} 笔</Descriptions.Item>
                   </Descriptions>
                 ) : (

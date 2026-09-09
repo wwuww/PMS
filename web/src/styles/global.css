@@ -354,6 +354,15 @@ body {
   font-feature-settings: "tnum";
 }
 
+/* ---------- 页面区块面板（M36：与 Card 同一圆角 / 描边 / 阴影基线）----------
+   用途：页面内非 antd Card 的手写区块容器，统一视觉基线，避免散落内联样式。 */
+.pms-panel {
+  background: #ffffff;
+  border: 1px solid #eef0f4;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(31, 35, 41, 0.06);
+}
+
 /* Sider 折叠态：菜单项居中，避免文字/图标溢出 */
 .ant-layout-sider-collapsed .ant-menu-item,
 .ant-layout-sider-collapsed .ant-menu-submenu-title {

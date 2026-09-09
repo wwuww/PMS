@@ -12,20 +12,31 @@ import {
   Modal,
   Row,
   Select,
-  Spin,
-  Statistic,
   Table,
   Tabs,
   Tag,
   Typography,
   Space,
 } from "antd";
-import { ReloadOutlined, SolutionOutlined } from "@ant-design/icons";
+import {
+  CalendarOutlined,
+  DollarOutlined,
+  HomeOutlined,
+  LoginOutlined,
+  LogoutOutlined,
+  ReloadOutlined,
+  SolutionOutlined,
+  TeamOutlined,
+} from "@ant-design/icons";
 import dayjs, { type Dayjs } from "dayjs";
 import { listRooms, listBookings, listRoomTypes, receptionCheckIn, listHousekeeping } from "../api/endpoints";
 import type { Room, Booking, RoomType, RoomState, ReceptionCheckIn } from "../api/types";
 import { useTenant } from "../store/tenant";
 import { ROOM_STATE_LABELS } from "../domain/roomActions";
+import { fmtCents } from "../utils/format";
+// 必须带 .tsx 后缀：无后缀会优先解析到 format.ts（纯字符串工具），取不到组件。
+import { CellAmount } from "../utils/format.tsx";
+import StatCard from "../components/StatCard";
 
 const STATE_COLOR: Record<RoomState, string> = {
   vacant_clean: "#389e0d",
@@ -188,6 +199,31 @@ export default function ReceptionPage() {
     () => rooms.filter((r) => r.state === "vacant_dirty"),
     [rooms]
   );
+  // 待排房：已建预订但未分配房号
+  const pendingAssign = useMemo(
+    () => bookings.filter((b) => b.status === "created" && !b.room_no),
+    [bookings]
+  );
+  // 房费合计（单位：分，展示时由 fmtCents 转元）
+  const inHouseRevenue = useMemo(
+    () => inHouse.reduce((s, b) => s + (b.total_price ?? 0), 0),
+    [inHouse]
+  );
+  const arrivalRevenue = useMemo(
+    () => arrivals.reduce((s, b) => s + (b.total_price ?? 0), 0),
+    [arrivals]
+  );
+
+  /** 房费列（统一右对齐 + 金额单元格）。 */
+  const priceCol = {
+    title: "房费",
+    dataIndex: "total_price",
+    key: "total_price",
+    width: 108,
+    align: "right" as const,
+    className: "text-right",
+    render: (v: number | null) => <CellAmount value={v ?? 0} />,
+  };
 
   const bookingCols = [
     { title: "客人", dataIndex: "guest_name", key: "guest_name", render: (v: string) => v || "—" },
@@ -241,33 +277,108 @@ export default function ReceptionPage() {
 
   return (
     <div>
-      <Space style={{ marginBottom: 12, width: "100%", justifyContent: "space-between" }} wrap>
-        <Typography.Title level={4} style={{ margin: 0 }}>
-          前台接待看板
-        </Typography.Title>
-        <Button icon={<ReloadOutlined />} onClick={load} loading={loading}>
-          刷新
-        </Button>
-        <Button
-          type="primary"
-          icon={<SolutionOutlined />}
-          onClick={() => setReceptionOpen(true)}
-        >
-          接待办理
-        </Button>
-      </Space>
+      {/* 页头：对齐 Dashboard / Reports（标题 + 副标题 + 工具条） */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-end",
+          marginBottom: 16,
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        <div>
+          <Typography.Title level={4} style={{ margin: 0, marginBottom: 4 }}>
+            前台接待看板
+          </Typography.Title>
+          <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+            今日预抵 / 预离 · 在住 · 待清扫 · 房态概览
+          </Typography.Text>
+        </div>
+        <Space>
+          <Button icon={<ReloadOutlined />} onClick={load} loading={loading}>
+            刷新
+          </Button>
+          <Button
+            type="primary"
+            icon={<SolutionOutlined />}
+            onClick={() => setReceptionOpen(true)}
+          >
+            接待办理
+          </Button>
+        </Space>
+      </div>
+
+      {/* 今日业务概览（StatCard 基线） */}
+      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+        <Col xs={12} sm={12} md={4}>
+          <StatCard
+            label="今日预抵"
+            value={arrivals.length}
+            sub="待办理入住"
+            accent="#fa8c16"
+            icon={<LoginOutlined />}
+          />
+        </Col>
+        <Col xs={12} sm={12} md={4}>
+          <StatCard
+            label="今日预离"
+            value={departures.length}
+            sub="待结账退房"
+            accent="#2f54eb"
+            icon={<LogoutOutlined />}
+          />
+        </Col>
+        <Col xs={12} sm={12} md={4}>
+          <StatCard
+            label="在住"
+            value={inHouse.length}
+            sub="当前在住订单"
+            accent="#13c2c2"
+            icon={<TeamOutlined />}
+          />
+        </Col>
+        <Col xs={12} sm={12} md={4}>
+          <StatCard
+            label="待排房"
+            value={pendingAssign.length}
+            sub="预订未分配房号"
+            accent="#722ed1"
+            icon={<CalendarOutlined />}
+          />
+        </Col>
+        <Col xs={12} sm={12} md={4}>
+          <StatCard
+            label="在住房费"
+            value={fmtCents(inHouseRevenue)}
+            sub="在住订单房费合计"
+            accent="#1677ff"
+            icon={<DollarOutlined />}
+          />
+        </Col>
+        <Col xs={12} sm={12} md={4}>
+          <StatCard
+            label="今日预抵房费"
+            value={fmtCents(arrivalRevenue)}
+            sub="预抵订单房费合计"
+            accent="#389e0d"
+            icon={<DollarOutlined />}
+          />
+        </Col>
+      </Row>
 
       {/* 房态概览 */}
-      <Row gutter={12} style={{ marginBottom: 16 }}>
+      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         {(["vacant_clean", "vacant_dirty", "occupied", "arrival_locked", "maintenance", "out_of_service"] as RoomState[]).map((s) => (
-          <Col span={4} key={s}>
-            <Card size="small">
-              <Statistic
-                title={ROOM_STATE_LABELS[s]}
-                value={stateCounts[s] || 0}
-                valueStyle={{ color: STATE_COLOR[s], fontSize: 22 }}
-              />
-            </Card>
+          <Col xs={12} sm={8} md={4} key={s}>
+            <StatCard
+              label={ROOM_STATE_LABELS[s]}
+              value={stateCounts[s] || 0}
+              suffix="间"
+              accent={STATE_COLOR[s]}
+              icon={<HomeOutlined />}
+            />
           </Col>
         ))}
       </Row>
@@ -292,6 +403,7 @@ export default function ReceptionPage() {
                 pagination={false}
                 columns={[
                   ...bookingCols,
+                  priceCol,
                   {
                     title: "操作",
                     key: "op",
@@ -331,6 +443,7 @@ export default function ReceptionPage() {
                 pagination={false}
                 columns={[
                   ...bookingCols,
+                  priceCol,
                   {
                     title: "操作",
                     key: "op",
@@ -376,6 +489,7 @@ export default function ReceptionPage() {
                   { title: "客人", dataIndex: "guest_name", key: "guest_name", render: (v: string) => v || "—" },
                   { title: "房号", dataIndex: "room_no", key: "room_no", render: (v: string | null) => v ?? "—" },
                   { title: "离店", dataIndex: "check_out_date", key: "check_out_date" },
+                  priceCol,
                   {
                     title: "操作",
                     key: "op",
