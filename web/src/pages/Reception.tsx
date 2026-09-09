@@ -19,14 +19,9 @@ import {
   Space,
 } from "antd";
 import {
-  CalendarOutlined,
-  DollarOutlined,
   HomeOutlined,
-  LoginOutlined,
-  LogoutOutlined,
   ReloadOutlined,
   SolutionOutlined,
-  TeamOutlined,
 } from "@ant-design/icons";
 import dayjs, { type Dayjs } from "dayjs";
 import { listRooms, listBookings, listRoomTypes, receptionCheckIn, listHousekeeping } from "../api/endpoints";
@@ -199,22 +194,7 @@ export default function ReceptionPage() {
     () => rooms.filter((r) => r.state === "vacant_dirty"),
     [rooms]
   );
-  // 待排房：已建预订但未分配房号
-  const pendingAssign = useMemo(
-    () => bookings.filter((b) => b.status === "created" && !b.room_no),
-    [bookings]
-  );
-  // 房费合计（单位：分，展示时由 fmtCents 转元）
-  const inHouseRevenue = useMemo(
-    () => inHouse.reduce((s, b) => s + (b.total_price ?? 0), 0),
-    [inHouse]
-  );
-  const arrivalRevenue = useMemo(
-    () => arrivals.reduce((s, b) => s + (b.total_price ?? 0), 0),
-    [arrivals]
-  );
-
-  /** 房费列（统一右对齐 + 金额单元格）。 */
+  // 房费列（统一右对齐 + 金额单元格）。
   const priceCol = {
     title: "房费",
     dataIndex: "total_price",
@@ -309,64 +289,6 @@ export default function ReceptionPage() {
           </Button>
         </Space>
       </div>
-
-      {/* 今日业务概览（StatCard 基线） */}
-      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-        <Col xs={12} sm={12} md={4}>
-          <StatCard
-            label="今日预抵"
-            value={arrivals.length}
-            sub="待办理入住"
-            accent="#fa8c16"
-            icon={<LoginOutlined />}
-          />
-        </Col>
-        <Col xs={12} sm={12} md={4}>
-          <StatCard
-            label="今日预离"
-            value={departures.length}
-            sub="待结账退房"
-            accent="#2f54eb"
-            icon={<LogoutOutlined />}
-          />
-        </Col>
-        <Col xs={12} sm={12} md={4}>
-          <StatCard
-            label="在住"
-            value={inHouse.length}
-            sub="当前在住订单"
-            accent="#13c2c2"
-            icon={<TeamOutlined />}
-          />
-        </Col>
-        <Col xs={12} sm={12} md={4}>
-          <StatCard
-            label="待排房"
-            value={pendingAssign.length}
-            sub="预订未分配房号"
-            accent="#722ed1"
-            icon={<CalendarOutlined />}
-          />
-        </Col>
-        <Col xs={12} sm={12} md={4}>
-          <StatCard
-            label="在住房费"
-            value={fmtCents(inHouseRevenue)}
-            sub="在住订单房费合计"
-            accent="#1677ff"
-            icon={<DollarOutlined />}
-          />
-        </Col>
-        <Col xs={12} sm={12} md={4}>
-          <StatCard
-            label="今日预抵房费"
-            value={fmtCents(arrivalRevenue)}
-            sub="预抵订单房费合计"
-            accent="#389e0d"
-            icon={<DollarOutlined />}
-          />
-        </Col>
-      </Row>
 
       {/* 房态概览 */}
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
