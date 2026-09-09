@@ -22,14 +22,11 @@ import {
 } from "antd";
 import {
   CheckCircleOutlined,
-  ClearOutlined,
   CreditCardOutlined,
   DollarOutlined,
-  HomeOutlined,
   IdcardOutlined,
   ReloadOutlined,
   SwapOutlined,
-  TeamOutlined,
   TrophyOutlined,
   WalletOutlined,
 } from "@ant-design/icons";
@@ -158,17 +155,7 @@ export default function ReceptionWorkbenchPage() {
   const rtName = (id: number | string | null | undefined) =>
     id == null ? "—" : roomTypes.find((x) => x.id === String(id))?.name ?? `#${id}`;
 
-  // 顶部房态概览（数据取自本页已加载的 rooms，未新增接口）
-  const roomOverview = useMemo(() => {
-    const count = (states: string[]) => rooms.filter((r) => states.includes(r.state)).length;
-    return {
-      total: rooms.length,
-      assignable: assignableRooms.length,
-      occupied: count(["occupied"]),
-      dirty: count(["vacant_dirty"]),
-    };
-  }, [rooms, assignableRooms]);
-
+  
   const currentStep = ctx ? FLOW_STAGES.findIndex((s) => s.key === ctx.flow_state) : -1;
 
   const openAction = (a: ReceptionAction) => {
@@ -292,46 +279,6 @@ export default function ReceptionWorkbenchPage() {
           </Button>
         </Space>
       </div>
-
-      {/* 顶部概览：房态关键数字（StatCard 基线） */}
-      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-        <Col xs={12} sm={12} md={6}>
-          <StatCard
-            label="总房数"
-            value={roomOverview.total}
-            sub="本门店房间总量"
-            accent="#1677ff"
-            icon={<HomeOutlined />}
-          />
-        </Col>
-        <Col xs={12} sm={12} md={6}>
-          <StatCard
-            label="可排房"
-            value={roomOverview.assignable}
-            sub="空净 / 锁房"
-            accent="#389e0d"
-            icon={<CheckCircleOutlined />}
-          />
-        </Col>
-        <Col xs={12} sm={12} md={6}>
-          <StatCard
-            label="在住"
-            value={roomOverview.occupied}
-            sub="当前占用房间"
-            accent="#13c2c2"
-            icon={<TeamOutlined />}
-          />
-        </Col>
-        <Col xs={12} sm={12} md={6}>
-          <StatCard
-            label="待清扫"
-            value={roomOverview.dirty}
-            sub="空脏房"
-            accent="#fa8c16"
-            icon={<ClearOutlined />}
-          />
-        </Col>
-      </Row>
 
       {/* 查询栏 */}
       <Card size="small" style={{ marginBottom: 16 }}>
