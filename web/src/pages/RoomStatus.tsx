@@ -818,13 +818,13 @@ export default function RoomStatusPage() {
             {locked && <LockOutlined style={{ fontSize: 12, color: "#fff" }} title="锁房" />}
             {!!r.dnd && <AudioMutedOutlined style={{ fontSize: 12, color: "#fff" }} title="免打扰（DND）" />}
             {occDirty && <ClearOutlined style={{ fontSize: 12, color: "#d9d9d9" }} title="住脏：待清扫" />}
-            {guest?.linked && (
+            {r.state === "occupied" && guest?.linked && (
               <LinkOutlined
                 style={{ fontSize: 12, color: "#fff" }}
                 title={guest.is_master ? "联房 · 主房" : "联房 · 从房"}
               />
             )}
-            {guest?.hourly_start_time && (
+            {r.state === "occupied" && guest?.hourly_start_time && (
               <ClockCircleOutlined
                 style={{ fontSize: 12, color: "#fff" }}
                 title={`钟点房 ${guest.hourly_start_time}-${hourlyEndOf(guest.hourly_start_time, guest.hourly_hours ?? 0)}（${guest.hourly_hours ?? 0} 小时）`}
