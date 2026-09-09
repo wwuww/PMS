@@ -23,13 +23,10 @@ import {
 } from "antd";
 import {
   ArrowsAltOutlined,
-  CalendarOutlined,
   DollarOutlined,
   FileSearchOutlined,
-  HomeOutlined,
   KeyOutlined,
   LinkOutlined,
-  LoginOutlined,
   LogoutOutlined,
   PauseOutlined,
   PrinterOutlined,
@@ -37,7 +34,6 @@ import {
   ReloadOutlined,
   SaveOutlined,
   SelectOutlined,
-  TeamOutlined,
   UserAddOutlined,
 } from "@ant-design/icons";
 import dayjs, { Dayjs } from "dayjs";
@@ -61,7 +57,6 @@ import { ROOM_STATE_LABELS, TRIGGER_LABELS } from "../domain/roomActions";
 import { fmtCents } from "../utils/format";
 // 必须带 .tsx 后缀：无后缀会优先解析到 format.ts（纯字符串工具），取不到组件。
 import { CellAmount } from "../utils/format.tsx";
-import StatCard from "../components/StatCard";
 
 const ID_TYPES = [
   { value: "ID", label: "居民身份证" },
@@ -235,26 +230,6 @@ export default function CheckInRegister() {
   const changeTargets = useMemo(
     () => rooms.filter((r) => r.state === "vacant_clean" && r.room_no !== roomNo),
     [rooms, roomNo]
-  );
-
-  // 顶部概览（数据全部来自本页已加载的 rooms / bookings，不新增接口）
-  const today = dayjs().format("YYYY-MM-DD");
-  const todayArrivals = useMemo(
-    () => bookings.filter((b) => b.status === "created" && b.check_in_date === today),
-    [bookings, today]
-  );
-  const todayDepartures = useMemo(
-    () => bookings.filter((b) => b.status === "checked_in" && b.check_out_date === today),
-    [bookings, today]
-  );
-  const inHouseCount = useMemo(() => bookings.filter((b) => b.status === "checked_in").length, [bookings]);
-  const pendingAssignCount = useMemo(
-    () => bookings.filter((b) => b.status === "created" && !b.room_no).length,
-    [bookings]
-  );
-  const todayArrivalRevenue = useMemo(
-    () => todayArrivals.reduce((s, b) => s + (b.total_price ?? 0), 0),
-    [todayArrivals]
   );
 
   // 实际到店时间：房态事件 check_in 的发生时刻
@@ -1001,64 +976,6 @@ export default function CheckInRegister() {
           </Button>
         </Space>
       </div>
-
-      {/* 顶部概览：全部取自本页已加载的 rooms / bookings，未新增接口 */}
-      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-        <Col xs={12} sm={12} md={4}>
-          <StatCard
-            label="今日预抵"
-            value={todayArrivals.length}
-            sub="预订待入住"
-            accent="#fa8c16"
-            icon={<LoginOutlined />}
-          />
-        </Col>
-        <Col xs={12} sm={12} md={4}>
-          <StatCard
-            label="今日预离"
-            value={todayDepartures.length}
-            sub="需结账退房"
-            accent="#2f54eb"
-            icon={<LogoutOutlined />}
-          />
-        </Col>
-        <Col xs={12} sm={12} md={4}>
-          <StatCard
-            label="在住"
-            value={inHouseCount}
-            sub="当前在住订单"
-            accent="#13c2c2"
-            icon={<TeamOutlined />}
-          />
-        </Col>
-        <Col xs={12} sm={12} md={4}>
-          <StatCard
-            label="待排房"
-            value={pendingAssignCount}
-            sub="预订未分配房号"
-            accent="#722ed1"
-            icon={<CalendarOutlined />}
-          />
-        </Col>
-        <Col xs={12} sm={12} md={4}>
-          <StatCard
-            label="可排房"
-            value={assignableRooms.length}
-            sub="空净 / 空脏 / 锁房"
-            accent="#389e0d"
-            icon={<HomeOutlined />}
-          />
-        </Col>
-        <Col xs={12} sm={12} md={4}>
-          <StatCard
-            label="今日预抵房费"
-            value={fmtCents(todayArrivalRevenue)}
-            sub="预抵订单房费合计"
-            accent="#1677ff"
-            icon={<DollarOutlined />}
-          />
-        </Col>
-      </Row>
 
       <Tabs
         activeKey={topTab}
