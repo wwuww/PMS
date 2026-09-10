@@ -67,6 +67,12 @@ class HotelUpdate(BaseModel):
 class RoomTypeCreate(BaseModel):
     code: str
     name: str
+    # 批次② 字段补全
+    bed_number: int = 1
+    short_name: str | None = None
+    en_name: str | None = None
+    descript: str | None = None
+    is_valid: bool = True
     base_price: int = Field(ge=0, description="基准价（分）")
     hourly_rate: int | None = Field(default=None, ge=0, description="时租价（分/小时）")  # M24
 
@@ -205,6 +211,27 @@ class BookingOut(BaseModel):
     is_link_master: bool = False
     # M32.17b：钟点房到店时刻（HH:MM）
     hourly_start_time: str | None = None
+    # 批次② 核心实体字段补全（维也纳数据字典对齐）
+    guest_source_type: str | None = None
+    member_no: str | None = None
+    member_type: str | None = None
+    is_vip: bool = False
+    is_secret: bool = False
+    is_quick_depart: bool = False
+    is_print_real_price: bool = True
+    is_add_point: bool = True
+    is_guarantee: bool = False
+    guarantee_hold_until: str | None = None
+    guarantor: str | None = None
+    sales_id: str | None = None
+    activity_code: str | None = None
+    upgrade_room_type_id: int | None = None
+    group_name: str | None = None
+    group_type: str | None = None
+    group_leader: str | None = None
+    group_tel: str | None = None
+    email: str | None = None
+    country: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -309,6 +336,16 @@ class ReceptionCheckInIn(BaseModel):
     nationality: str | None = Field(default=None, max_length=32)
     ethnicity: str | None = Field(default=None, max_length=32)
     note: str | None = Field(default=None, max_length=256)
+    # 批次② 核心实体字段补全：登记页 6 个 checkbox + 客源/会员号/担保 接线
+    guest_source_type: str | None = Field(default=None, max_length=20)
+    member_no: str | None = Field(default=None, max_length=32)
+    is_vip: bool = False
+    is_secret: bool = False
+    is_quick_depart: bool = False
+    is_print_real_price: bool = True
+    is_add_point: bool = True
+    is_guarantee: bool = False
+    guarantee_hold_until: str | None = None
     operator: str = "front_desk"
 
 
@@ -510,6 +547,10 @@ class MemberCreate(BaseModel):
     hotel_id: int
     name: str = Field(min_length=1, max_length=64)
     phone: str = Field(min_length=6, max_length=32)
+    # 批次② 字段补全
+    member_no: str | None = None
+    card_type: str | None = None
+    join_date: str | None = None
 
 
 class MemberOut(BaseModel):
@@ -523,6 +564,10 @@ class MemberOut(BaseModel):
     points: int
     stays: int
     total_spend: int
+    # 批次② 字段补全
+    member_no: str | None = None
+    card_type: str | None = None
+    join_date: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -587,6 +632,15 @@ class GuestOut(BaseModel):
     member_level: str | None = None  # 关联会员等级（客档联动会员）
     member_points: int | None = None  # 关联会员积分
     member_stored_value: int | None = None  # 关联会员储值（分）
+    # 批次② 字段补全
+    en_name: str | None = None
+    native_place: str | None = None
+    nation: str | None = None
+    is_valid: bool = True
+    come_time: str | None = None
+    head_url: str | None = None
+    id_doc_sign_org: str | None = None
+    id_doc_valid_to: str | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
 

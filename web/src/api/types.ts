@@ -31,6 +31,12 @@ export interface RoomType {
   name: string;
   base_price: number;
   hourly_rate: number | null; // M24：时租价（分/小时）
+  // 批次② 核心实体字段补全
+  bed_number?: number;
+  short_name?: string | null;
+  en_name?: string | null;
+  descript?: string | null;
+  is_valid?: boolean;
 }
 
 export type RoomState =
@@ -51,6 +57,13 @@ export interface Room {
   state: RoomState;
   dnd: number; // M31：免打扰 0/1
   pre_lock_state?: string | null;  // M32.3 锁房前房态（锁房卡片用原色+小锁）
+  // 批次② 核心实体字段补全
+  building_id?: string | null;
+  telephone?: string | null;
+  room_card_no?: string | null;
+  room_name?: string | null;
+  memo?: string | null;
+  is_valid?: boolean;
 }
 
 export interface RoomStateCount {
@@ -87,6 +100,27 @@ export interface Booking {
   link_group_id: string | null; // M32.15：联房组（在住单之间）
   is_link_master: boolean; // M32.15：主房标记
   hourly_start_time: string | null; // M32.17b：钟点房到店时刻 HH:MM
+  // 批次② 核心实体字段补全
+  guest_source_type?: string | null;
+  member_no?: string | null;
+  member_type?: string | null;
+  is_vip?: boolean;
+  is_secret?: boolean;
+  is_quick_depart?: boolean;
+  is_print_real_price?: boolean;
+  is_add_point?: boolean;
+  is_guarantee?: boolean;
+  guarantee_hold_until?: string | null;
+  guarantor?: string | null;
+  sales_id?: string | null;
+  activity_code?: string | null;
+  upgrade_room_type_id?: string | null;
+  group_name?: string | null;
+  group_type?: string | null;
+  group_leader?: string | null;
+  group_tel?: string | null;
+  email?: string | null;
+  country?: string | null;
 }
 
 export interface BookingCreate {
@@ -103,6 +137,27 @@ export interface BookingCreate {
   chat_session_id: string | null;
   stay_type?: "daily" | "hourly"; // M24：时租房
   hourly_hours?: number | null; // M24：时租时长（小时）
+  // 批次② 核心实体字段补全
+  guest_source_type?: string | null;
+  member_no?: string | null;
+  member_type?: string | null;
+  is_vip?: boolean;
+  is_secret?: boolean;
+  is_quick_depart?: boolean;
+  is_print_real_price?: boolean;
+  is_add_point?: boolean;
+  is_guarantee?: boolean;
+  guarantee_hold_until?: string | null;
+  guarantor?: string | null;
+  sales_id?: string | null;
+  activity_code?: string | null;
+  upgrade_room_type_id?: string | null;
+  group_name?: string | null;
+  group_type?: string | null;
+  group_leader?: string | null;
+  group_tel?: string | null;
+  email?: string | null;
+  country?: string | null;
 }
 
 /** 统一接待办理（预订/散客双模式入住）。 */
@@ -117,6 +172,16 @@ export interface ReceptionCheckIn {
   check_in_date?: string | null;
   check_out_date?: string | null;
   operator?: string;
+  // 批次② 核心实体字段补全
+  guest_source_type?: string | null;
+  member_no?: string | null;
+  is_vip?: boolean;
+  is_secret?: boolean;
+  is_quick_depart?: boolean;
+  is_print_real_price?: boolean;
+  is_add_point?: boolean;
+  is_guarantee?: boolean;
+  guarantee_hold_until?: string | null;
 }
 
 // ---------- 统一接待办理流：单客上下文 + 编排状态机（M1/M2，R1/R2/R3/R4） ----------
@@ -613,12 +678,20 @@ export interface Member {
   points: number;
   stays: number;
   total_spend: number; // 分
+  // 批次② 核心实体字段补全
+  member_no?: string | null;
+  card_type?: string | null;
+  join_date?: string | null;
 }
 
 export interface MemberCreate {
   hotel_id: string;
   name: string;
   phone: string;
+  // 批次② 核心实体字段补全
+  member_no?: string | null;
+  card_type?: string | null;
+  join_date?: string | null;
 }
 
 export interface MemberRecharge {
@@ -858,6 +931,13 @@ export interface RateCode {
   agreement_type: string;
   stay_type: string;
   discount_pct: number; // 基点（0-10000，10000=原价）
+  // 批次② 核心实体字段补全
+  stay_class?: string | null;
+  rate_type?: string | null;
+  valid_from?: string | null;
+  valid_to?: string | null;
+  is_overlay?: boolean;
+  week?: string | null;
 }
 
 export interface RateCodeCreate {
@@ -869,6 +949,13 @@ export interface RateCodeCreate {
   room_type_id: string | null;
   stay_type?: string;
   discount_pct?: number;
+  // 批次② 核心实体字段补全
+  stay_class?: string | null;
+  rate_type?: string | null;
+  valid_from?: string | null;
+  valid_to?: string | null;
+  is_overlay?: boolean;
+  week?: string | null;
 }
 
 export interface PriceCalendar {
@@ -1093,12 +1180,25 @@ export interface RoomTypeCreate {
   code: string;
   name: string;
   base_price: number; // 分
+  // 批次② 核心实体字段补全
+  bed_number?: number;
+  short_name?: string | null;
+  en_name?: string | null;
+  descript?: string | null;
+  is_valid?: boolean;
 }
 
 export interface RoomCreate {
   room_type_id: string;
   room_no: string;
   floor: string;
+  // 批次② 核心实体字段补全
+  building_id?: string | null;
+  telephone?: string | null;
+  room_card_no?: string | null;
+  room_name?: string | null;
+  memo?: string | null;
+  is_valid?: boolean;
 }
 
 export interface GroupPricePolicyIn {
@@ -1265,6 +1365,15 @@ export interface Guest {
   member_stored_value: number | null; // 分
   created_at: string | null;
   updated_at: string | null;
+  // 批次② 核心实体字段补全
+  en_name?: string | null;
+  native_place?: string | null;
+  nation?: string | null;
+  is_valid?: boolean;
+  come_time?: string | null;
+  head_url?: string | null;
+  id_doc_sign_org?: string | null;
+  id_doc_valid_to?: string | null;
 }
 
 // ---------- 餐饮 POS（F&B，M21） ----------

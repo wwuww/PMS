@@ -623,6 +623,12 @@ async def create_room_type(
         name=body.name,
         base_price=body.base_price,
         hourly_rate=body.hourly_rate,
+        # 批次② 字段补全
+        bed_number=body.bed_number,
+        short_name=body.short_name,
+        en_name=body.en_name,
+        descript=body.descript,
+        is_valid=body.is_valid,
     )
     session.add(room_type)
     try:
@@ -1068,6 +1074,8 @@ async def create_booking(
 async def list_bookings(
     tenant_id: str,
     status_: str | None = None,
+    guest_source_type: str | None = None,
+    member_no: str | None = None,
     limit: int | None = None,
     offset: int = 0,
     session: AsyncSession = Depends(get_session),
@@ -1081,6 +1089,10 @@ async def list_bookings(
     stmt = select(Booking).where(Booking.tenant_id == tenant_id)
     if status_:
         stmt = stmt.where(Booking.status == status_)
+    if guest_source_type:
+        stmt = stmt.where(Booking.guest_source_type == guest_source_type)
+    if member_no:
+        stmt = stmt.where(Booking.member_no == member_no)
     stmt = stmt.offset(max(0, offset)).limit(
         MAX_LIST_ROWS if limit is None else max(1, min(limit, MAX_LIST_ROWS))
     )
@@ -1301,6 +1313,15 @@ async def reception_check_in(
             nationality=body.nationality,
             ethnicity=body.ethnicity,
             note=body.note,
+            guest_source_type=body.guest_source_type,
+            member_no=body.member_no,
+            is_vip=body.is_vip,
+            is_secret=body.is_secret,
+            is_quick_depart=body.is_quick_depart,
+            is_print_real_price=body.is_print_real_price,
+            is_add_point=body.is_add_point,
+            is_guarantee=body.is_guarantee,
+            guarantee_hold_until=body.guarantee_hold_until,
         )
     except ValueError as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
@@ -1598,7 +1619,12 @@ async def create_member(
     if not tenant:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "租户不存在")
     svc = MemberService(session)
-    member = await svc.register(tenant_id, body.hotel_id, body.name, body.phone)
+    member = await svc.register(
+        tenant_id, body.hotel_id, body.name, body.phone,
+        member_no=body.member_no,
+        card_type=body.card_type,
+        join_date=body.join_date,
+    )
     await session.commit()
     await session.refresh(member)
     return member

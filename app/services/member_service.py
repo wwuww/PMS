@@ -16,13 +16,29 @@ class MemberService:
         self.session = session
 
     async def register(
-        self, tenant_id: str, hotel_id: int, name: str, phone: str
+        self,
+        tenant_id: str,
+        hotel_id: int,
+        name: str,
+        phone: str,
+        *,
+        member_no: str | None = None,
+        card_type: str | None = None,
+        join_date: str | None = None,
     ) -> Member:
         existing = await self.get_by_phone(tenant_id, phone)
         if existing:
             return existing
         member = Member(
-            tenant_id=tenant_id, hotel_id=hotel_id, name=name, phone=phone, level="NORMAL"
+            tenant_id=tenant_id,
+            hotel_id=hotel_id,
+            name=name,
+            phone=phone,
+            level="NORMAL",
+            # 批次② 字段补全
+            member_no=member_no,
+            card_type=card_type,
+            join_date=join_date,
         )
         self.session.add(member)
         await self.session.flush()

@@ -8,6 +8,7 @@ import {
   Input,
   Select,
   DatePicker,
+  Switch,
   Tag,
   App,
   Popconfirm,
@@ -43,6 +44,16 @@ const STATUS_META: Record<BookingStatus, { label: string; color: string }> = {
   cancelled: { label: "已取消", color: "red" },
   noshow: { label: "未到店", color: "orange" },
 };
+
+// 批次②：客源类型选项（value 为后端枚举码）
+const GUEST_SOURCE_OPTIONS = [
+  { value: "WI", label: "上门散客" },
+  { value: "IM", label: "个人会员" },
+  { value: "CM", label: "公司会员" },
+  { value: "LP", label: "长包" },
+  { value: "GP", label: "团队" },
+  { value: "AM", label: "中介协议" },
+];
 
 export default function BookingsPage() {
   const { tenantCode, hotelId } = useTenant();
@@ -115,6 +126,27 @@ export default function BookingsPage() {
         stay_type: v.stay_type || "daily",
         hourly_hours:
           v.stay_type === "hourly" ? Number(v.hourly_hours) || null : null,
+        // 批次② 核心实体字段补全
+        guest_source_type: v.guest_source_type || null,
+        member_no: v.member_no || null,
+        member_type: v.member_type || null,
+        is_vip: v.is_vip ?? false,
+        is_secret: v.is_secret ?? false,
+        is_quick_depart: v.is_quick_depart ?? false,
+        is_print_real_price: v.is_print_real_price ?? true,
+        is_add_point: v.is_add_point ?? true,
+        is_guarantee: v.is_guarantee ?? false,
+        guarantee_hold_until: v.guarantee_hold_until || null,
+        guarantor: v.guarantor || null,
+        sales_id: v.sales_id || null,
+        activity_code: v.activity_code || null,
+        upgrade_room_type_id: v.upgrade_room_type_id || null,
+        group_name: v.group_name || null,
+        group_type: v.group_type || null,
+        group_leader: v.group_leader || null,
+        group_tel: v.group_tel || null,
+        email: v.email || null,
+        country: v.country || null,
       });
       message.success("预订创建成功");
       setCreateOpen(false);
@@ -250,6 +282,35 @@ export default function BookingsPage() {
       render: (s: BookingStatus) => (
         <Tag color={STATUS_META[s].color}>{STATUS_META[s].label}</Tag>
       ),
+    },
+    // 批次② 核心实体字段补全：回显
+    {
+      title: "客源",
+      dataIndex: "guest_source_type",
+      key: "guest_source_type",
+      render: (v: string | null) =>
+        v ? GUEST_SOURCE_OPTIONS.find((o) => o.value === v)?.label || v : "—",
+    },
+    {
+      title: "VIP",
+      dataIndex: "is_vip",
+      key: "is_vip",
+      align: "center" as const,
+      render: (v: boolean | undefined) => (v ? <Tag color="gold">VIP</Tag> : "—"),
+    },
+    {
+      title: "保密",
+      dataIndex: "is_secret",
+      key: "is_secret",
+      align: "center" as const,
+      render: (v: boolean | undefined) => (v ? <Tag>保密</Tag> : "—"),
+    },
+    {
+      title: "担保",
+      dataIndex: "is_guarantee",
+      key: "is_guarantee",
+      align: "center" as const,
+      render: (v: boolean | undefined) => (v ? <Tag color="orange">担保</Tag> : "—"),
     },
     {
       title: "操作",
@@ -391,6 +452,86 @@ export default function BookingsPage() {
           <Form.Item name="guest_phone" label="客人手机（可选）">
             <Input placeholder="如 13800000000" />
           </Form.Item>
+
+          {/* 批次② 核心实体字段补全 */}
+          <Form.Item name="guest_source_type" label="客源类型">
+            <Select
+              allowClear
+              placeholder="选择客源类型"
+              options={GUEST_SOURCE_OPTIONS}
+            />
+          </Form.Item>
+          <Space size={12} style={{ display: "flex" }}>
+            <Form.Item name="member_no" label="会员号" style={{ flex: 1 }}>
+              <Input placeholder="会员卡号 / 会员号" maxLength={64} />
+            </Form.Item>
+            <Form.Item name="member_type" label="会员类型" style={{ flex: 1 }}>
+              <Input placeholder="如：个人 / 公司" maxLength={32} />
+            </Form.Item>
+          </Space>
+          <Space size={12} style={{ display: "flex" }} wrap>
+            <Form.Item name="is_vip" label="VIP" valuePropName="checked" style={{ flex: 1 }}>
+              <Switch />
+            </Form.Item>
+            <Form.Item name="is_secret" label="信息保密" valuePropName="checked" style={{ flex: 1 }}>
+              <Switch />
+            </Form.Item>
+            <Form.Item name="is_quick_depart" label="无停留离店" valuePropName="checked" style={{ flex: 1 }}>
+              <Switch />
+            </Form.Item>
+            <Form.Item name="is_print_real_price" label="价格保密(不打印真实价)" valuePropName="checked" style={{ flex: 1 }}>
+              <Switch />
+            </Form.Item>
+            <Form.Item name="is_add_point" label="计积分" valuePropName="checked" style={{ flex: 1 }}>
+              <Switch />
+            </Form.Item>
+            <Form.Item name="is_guarantee" label="担保" valuePropName="checked" style={{ flex: 1 }}>
+              <Switch />
+            </Form.Item>
+          </Space>
+          <Form.Item name="guarantee_hold_until" label="担保保留至（ISO8601，可空）">
+            <Input placeholder="如 2024-01-15T18:00:00" maxLength={32} />
+          </Form.Item>
+          <Space size={12} style={{ display: "flex" }}>
+            <Form.Item name="guarantor" label="担保人" style={{ flex: 1 }}>
+              <Input placeholder="担保人姓名" maxLength={64} />
+            </Form.Item>
+            <Form.Item name="sales_id" label="销售ID" style={{ flex: 1 }}>
+              <Input placeholder="销售员 ID" maxLength={64} />
+            </Form.Item>
+          </Space>
+          <Space size={12} style={{ display: "flex" }}>
+            <Form.Item name="activity_code" label="活动代码" style={{ flex: 1 }}>
+              <Input placeholder="活动代码" maxLength={64} />
+            </Form.Item>
+            <Form.Item name="upgrade_room_type_id" label="升级房型ID" style={{ flex: 1 }}>
+              <Input placeholder="升级目标房型 ID" maxLength={64} />
+            </Form.Item>
+          </Space>
+          <Space size={12} style={{ display: "flex" }}>
+            <Form.Item name="group_name" label="团体名称" style={{ flex: 1 }}>
+              <Input placeholder="团体名称" maxLength={128} />
+            </Form.Item>
+            <Form.Item name="group_type" label="团体类型" style={{ flex: 1 }}>
+              <Input placeholder="团体类型" maxLength={32} />
+            </Form.Item>
+          </Space>
+          <Space size={12} style={{ display: "flex" }}>
+            <Form.Item name="group_leader" label="团体负责人" style={{ flex: 1 }}>
+              <Input placeholder="负责人姓名" maxLength={64} />
+            </Form.Item>
+            <Form.Item name="group_tel" label="团体电话" style={{ flex: 1 }}>
+              <Input placeholder="团体联系电话" maxLength={32} />
+            </Form.Item>
+          </Space>
+          <Space size={12} style={{ display: "flex" }}>
+            <Form.Item name="email" label="邮箱" style={{ flex: 1 }}>
+              <Input placeholder="客人邮箱" maxLength={128} />
+            </Form.Item>
+            <Form.Item name="country" label="国家" style={{ flex: 1 }}>
+              <Input placeholder="如：中国" maxLength={64} />
+            </Form.Item>
+          </Space>
         </Form>
       </Modal>
 

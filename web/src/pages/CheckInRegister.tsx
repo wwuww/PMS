@@ -16,6 +16,7 @@ import {
   Select,
   Space,
   Spin,
+  Switch,
   Table,
   Tabs,
   Tag,
@@ -67,6 +68,16 @@ const ID_TYPES = [
 ];
 
 const ETHNICITIES = ["汉族", "壮族", "满族", "回族", "苗族", "维吾尔族", "土家族", "彝族", "蒙古族", "藏族", "其他"];
+
+// 批次②：客源类型选项（value 为后端枚举码）
+const GUEST_SOURCE_OPTIONS = [
+  { value: "WI", label: "上门散客" },
+  { value: "IM", label: "个人会员" },
+  { value: "CM", label: "公司会员" },
+  { value: "LP", label: "长包" },
+  { value: "GP", label: "团队" },
+  { value: "AM", label: "中介协议" },
+];
 
 /** 分区标题：蓝/红小节标题 */
 function SectionTitle({ text, red, extra }: { text: string; red?: boolean; extra?: React.ReactNode }) {
@@ -137,6 +148,16 @@ export default function CheckInRegister() {
     room_type_id: null as string | null,
     hourly: false as boolean,
     hourlyHours: 4 as number,
+    // 批次② 核心实体字段补全
+    guest_source_type: null as string | null,
+    member_no: "",
+    is_vip: false as boolean,
+    is_secret: false as boolean,
+    is_print_real_price: true as boolean, // 默认打印真实价；勾选“价格保密”时置 false
+    is_add_point: true as boolean,
+    is_quick_depart: false as boolean,
+    is_guarantee: false as boolean,
+    guarantee_hold_until: "",
   });
 
   const load = useCallback(async () => {
@@ -174,6 +195,16 @@ export default function CheckInRegister() {
             guest_phone: b.guest_phone || "",
             room_type_id: b.room_type_id ? String(b.room_type_id) : null,
             check_out_date: dayjs(b.check_out_date),
+            // 批次② 核心实体字段补全：从预订回显
+            guest_source_type: b.guest_source_type ?? f.guest_source_type,
+            member_no: b.member_no ?? "",
+            is_vip: b.is_vip ?? false,
+            is_secret: b.is_secret ?? false,
+            is_print_real_price: b.is_print_real_price ?? true,
+            is_add_point: b.is_add_point ?? true,
+            is_quick_depart: b.is_quick_depart ?? false,
+            is_guarantee: b.is_guarantee ?? false,
+            guarantee_hold_until: b.guarantee_hold_until ?? "",
           }));
           if (!roomNo && b.room_no) setRoomNo(b.room_no);
         }
@@ -225,6 +256,16 @@ export default function CheckInRegister() {
       guest_phone: stayBooking.guest_phone || f.guest_phone,
       room_type_id: stayBooking.room_type_id ? String(stayBooking.room_type_id) : f.room_type_id,
       check_out_date: stayBooking.check_out_date ? dayjs(stayBooking.check_out_date) : f.check_out_date,
+      // 批次② 核心实体字段补全：从在住单回显
+      guest_source_type: stayBooking.guest_source_type ?? f.guest_source_type,
+      member_no: stayBooking.member_no ?? "",
+      is_vip: stayBooking.is_vip ?? false,
+      is_secret: stayBooking.is_secret ?? false,
+      is_print_real_price: stayBooking.is_print_real_price ?? true,
+      is_add_point: stayBooking.is_add_point ?? true,
+      is_quick_depart: stayBooking.is_quick_depart ?? false,
+      is_guarantee: stayBooking.is_guarantee ?? false,
+      guarantee_hold_until: stayBooking.guarantee_hold_until ?? "",
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isStay, stayBooking?.id]);
@@ -304,6 +345,16 @@ export default function CheckInRegister() {
         email: form.email.trim() || null,
         address: form.address.trim() || null,
         note: form.note.trim() || null,
+        // 批次② 核心实体字段补全
+        guest_source_type: form.guest_source_type || null,
+        member_no: form.member_no.trim() || null,
+        is_vip: form.is_vip,
+        is_secret: form.is_secret,
+        is_quick_depart: form.is_quick_depart,
+        is_print_real_price: form.is_print_real_price,
+        is_add_point: form.is_add_point,
+        is_guarantee: form.is_guarantee,
+        guarantee_hold_until: form.guarantee_hold_until.trim() || null,
       };
       if (booking) {
         payload.booking_id = Number(booking.id);
@@ -775,12 +826,88 @@ export default function CheckInRegister() {
 
         {/* 押金行：接后端押金/预授权能力（M36 接线，取代原写死的四个禁用控件） */}
         <DepositQuickPanel bookingId={depositBookingId} roomNo={roomNo || null} />
-        <div style={{ display: "flex", gap: 16, marginTop: 8, flexWrap: "wrap" }}>
-          {["兑点", "当日起早", "VIP客人", "信息保密", "价格保密", "匿名单"].map((t) => (
-            <Checkbox key={t} disabled>
-              {t}
-            </Checkbox>
-          ))}
+        {/* 批次② 核心实体字段补全：登记选项（原为 6 个禁用占位 Checkbox，现改为实时绑定 form 状态） */}
+        <div style={{ display: "flex", gap: 16, marginTop: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <Checkbox
+            checked={form.is_vip}
+            disabled={isStay}
+            onChange={(e) => set({ is_vip: e.target.checked })}
+          >
+            VIP客人
+          </Checkbox>
+          <Checkbox
+            checked={form.is_secret}
+            disabled={isStay}
+            onChange={(e) => set({ is_secret: e.target.checked })}
+          >
+            信息保密
+          </Checkbox>
+          {/* 价格保密：勾选 = 不打印真实价 → is_print_real_price=false；默认不勾选（打印真实价） */}
+          <Checkbox
+            checked={!form.is_print_real_price}
+            disabled={isStay}
+            onChange={(e) => set({ is_print_real_price: !e.target.checked })}
+          >
+            价格保密(不打印真实价)
+          </Checkbox>
+          <Checkbox
+            checked={form.is_add_point}
+            disabled={isStay}
+            onChange={(e) => set({ is_add_point: e.target.checked })}
+          >
+            计积分
+          </Checkbox>
+          <Checkbox
+            checked={form.is_quick_depart}
+            disabled={isStay}
+            onChange={(e) => set({ is_quick_depart: e.target.checked })}
+          >
+            无停留离店
+          </Checkbox>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: 12 }}>担保</span>
+            <Switch
+              size="small"
+              checked={form.is_guarantee}
+              disabled={isStay}
+              onChange={(v) => set({ is_guarantee: v })}
+            />
+          </span>
+        </div>
+        <div style={{ display: "flex", gap: 10, marginTop: 8, flexWrap: "wrap" }}>
+          <div style={{ width: 200 }}>
+            <div style={{ fontSize: 12, marginBottom: 2, color: "#8a919c" }}>客源类型</div>
+            <Select
+              size="small"
+              style={{ width: "100%" }}
+              allowClear
+              placeholder="选择客源类型"
+              disabled={isStay}
+              value={form.guest_source_type ?? undefined}
+              onChange={(v) => set({ guest_source_type: v ?? null })}
+              options={GUEST_SOURCE_OPTIONS}
+            />
+          </div>
+          <div style={{ width: 200 }}>
+            <div style={{ fontSize: 12, marginBottom: 2, color: "#8a919c" }}>会员号</div>
+            <Input
+              size="small"
+              placeholder="会员卡号 / 会员号"
+              disabled={isStay}
+              value={form.member_no}
+              onChange={(e) => set({ member_no: e.target.value })}
+            />
+          </div>
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <div style={{ fontSize: 12, marginBottom: 2, color: "#8a919c" }}>担保保留至（ISO8601，可空）</div>
+            <Input
+              size="small"
+              placeholder="如 2024-01-15T18:00:00"
+              disabled={isStay}
+              value={form.guarantee_hold_until}
+              onChange={(e) => set({ guarantee_hold_until: e.target.value })}
+            />
+          </div>
         </div>
 
         <div style={{ height: 1, background: "#f2f4f7", margin: "12px 0" }} />

@@ -10,6 +10,7 @@ import {
   Table,
   Tag,
   Typography,
+  Switch,
   message,
 } from "antd";
 import { PlusOutlined, ReloadOutlined } from "@ant-design/icons";
@@ -92,6 +93,13 @@ export default function Rooms() {
         v.floor ||
         String(room_no).replace(/[^0-9]/g, "").slice(0, 2) ||
         "0",
+      // 批次② 核心实体字段补全（批量建房时统一套用到每间房）
+      building_id: v.building_id || null,
+      telephone: v.telephone || null,
+      room_card_no: v.room_card_no || null,
+      room_name: v.room_name || null,
+      memo: v.memo || null,
+      is_valid: v.is_valid ?? true,
     }));
     setSaving(true);
     try {
@@ -126,6 +134,18 @@ export default function Rooms() {
         },
       },
       { title: "门店ID", dataIndex: "hotel_id", width: 90 },
+      { title: "楼栋", dataIndex: "building_id", render: (v: string | null) => v || "—" },
+      { title: "电话", dataIndex: "telephone", render: (v: string | null) => v || "—" },
+      { title: "房卡号", dataIndex: "room_card_no", render: (v: string | null) => v || "—" },
+      { title: "房间名", dataIndex: "room_name", render: (v: string | null) => v || "—" },
+      { title: "备注", dataIndex: "memo", render: (v: string | null) => v || "—" },
+      {
+        title: "启用",
+        dataIndex: "is_valid",
+        align: "center" as const,
+        render: (v: boolean | undefined) =>
+          v === false ? <Tag color="default">停用</Tag> : <Tag color="green">启用</Tag>,
+      },
     ],
     [rtMap]
   );
@@ -178,7 +198,7 @@ export default function Rooms() {
         okText="创建"
         cancelText="取消"
       >
-        <Form form={form} layout="vertical" initialValues={{ floor: "4" }}>
+        <Form form={form} layout="vertical" initialValues={{ floor: "4", is_valid: true }}>
           <Form.Item
             name="room_type_id"
             label="房型"
@@ -201,6 +221,24 @@ export default function Rooms() {
           </Form.Item>
           <Form.Item name="floor" label="楼层（默认取房号前两位，可覆盖）">
             <Input placeholder="如：4" maxLength={8} />
+          </Form.Item>
+          <Form.Item name="building_id" label="楼栋ID">
+            <Input placeholder="如：B1" maxLength={32} />
+          </Form.Item>
+          <Form.Item name="telephone" label="电话">
+            <Input placeholder="分机或电话" maxLength={32} />
+          </Form.Item>
+          <Form.Item name="room_card_no" label="房卡号">
+            <Input placeholder="房卡卡号" maxLength={64} />
+          </Form.Item>
+          <Form.Item name="room_name" label="房间名">
+            <Input placeholder="房间别名" maxLength={64} />
+          </Form.Item>
+          <Form.Item name="memo" label="备注">
+            <Input.TextArea rows={2} maxLength={255} placeholder="房间备注" />
+          </Form.Item>
+          <Form.Item name="is_valid" label="启用" valuePropName="checked">
+            <Switch />
           </Form.Item>
           <Text type="secondary">目标门店：{hotelId ? `ID ${hotelId}` : "未选择"}</Text>
         </Form>

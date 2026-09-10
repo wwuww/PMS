@@ -99,6 +99,86 @@ class TestReception:
         )
         assert resp.status_code == 404
 
+    def test_reception_persists_batch2_fields(self, client: TestClient) -> None:
+        """批次②：登记页 6 个 checkbox + 客源/会员号/担保 经 reception 接线后落库。
+
+        覆盖散客（walk-in 新建预订）与预订（既有 booking 回写）两种模式，
+        并验证返回与重查均携带新字段（避免「前端发了但后端丢弃」）。
+        """
+        s = _seed(client)
+        code = s["tenant"]["code"]
+        batch2 = {
+            "guest_source_type": "IM",
+            "member_no": "M370001",
+            "is_vip": True,
+            "is_secret": True,
+            "is_quick_depart": True,
+            "is_print_real_price": False,
+            "is_add_point": False,
+            "is_guarantee": True,
+            "guarantee_hold_until": "2026-09-22T18:00:00",
+        }
+
+        # 散客模式：新字段随建预订落库
+        resp = client.post(
+            f"/api/v1/tenants/{code}/reception/check-in",
+            json={
+                "room_no": "0101",
+                "room_type_id": int(s["room_type"]["id"]),
+                "guest_name": "批次二散客",
+                "guest_phone": "13800000301",
+                "check_in_date": "2026-09-20",
+                "check_out_date": "2026-09-22",
+                "operator": "front_desk",
+                **batch2,
+            },
+        )
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        for k, v in batch2.items():
+            assert body.get(k) == v, f"{k}: {body.get(k)} != {v}"
+        bid = body["id"]
+        # 重查确认 DB 持久化（非仅响应回显）—— list_bookings 返回 ORM 全列
+        relist = client.get(
+            f"/api/v1/tenants/{code}/bookings", params={"member_no": "M370001"}
+        ).json()
+        assert any(b["id"] == bid and b["is_vip"] is True for b in relist), relist
+        assert any(b["member_no"] == "M370001" for b in relist)
+
+        # 预订模式：在既有 booking 上回写新字段（用第二间房，避免与散客同房冲突）
+        client.post(
+            f"/api/v1/hotels/{s['hotel']['id']}/rooms",
+            json=[{"room_type_id": s["room_type"]["id"], "room_no": "0102"}],
+        )
+        bk = client.post(
+            f"/api/v1/tenants/{code}/bookings",
+            json={
+                "hotel_id": int(s["hotel"]["id"]),
+                "room_type_id": int(s["room_type"]["id"]),
+                "guest_name": "批次二预订客",
+                "guest_phone": "13800000302",
+                "check_in_date": "2026-09-20",
+                "check_out_date": "2026-09-22",
+            },
+        ).json()
+        resp2 = client.post(
+            f"/api/v1/tenants/{code}/reception/check-in",
+            json={
+                "booking_id": bk["id"],
+                "room_no": "0102",
+                "operator": "front_desk",
+                **batch2,
+            },
+        )
+        assert resp2.status_code == 200, resp2.text
+        relist2 = client.get(
+            f"/api/v1/tenants/{code}/bookings", params={"member_no": "M370001"}
+        ).json()
+        assert any(
+            b["id"] == bk["id"] and b["is_secret"] is True and b["guest_source_type"] == "IM"
+            for b in relist2
+        ), relist2
+
     def test_double_check_in_conflict_409(self, client: TestClient) -> None:
         s = _seed(client)
         code = s["tenant"]["code"]

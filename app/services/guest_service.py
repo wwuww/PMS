@@ -50,6 +50,15 @@ class GuestService:
         tags: list[str] | None = None,
         notes: str | None = None,
         member_id: int | None = None,
+        # 批次② 字段补全
+        en_name: str | None = None,
+        native_place: str | None = None,
+        nation: str | None = None,
+        is_valid: bool = True,
+        come_time: str | None = None,
+        head_url: str | None = None,
+        id_doc_sign_org: str | None = None,
+        id_doc_valid_to: str | None = None,
     ) -> Guest:
         existing = None
         if phone:
@@ -76,6 +85,15 @@ class GuestService:
             address=address,
             notes=notes,
             member_id=member_id,
+            # 批次② 字段补全
+            en_name=en_name,
+            native_place=native_place,
+            nation=nation,
+            is_valid=is_valid,
+            come_time=come_time,
+            head_url=head_url,
+            id_doc_sign_org=id_doc_sign_org,
+            id_doc_valid_to=id_doc_valid_to,
         )
         if tags:
             guest.set_tags(tags)

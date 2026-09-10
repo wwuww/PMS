@@ -56,6 +56,16 @@ class ReceptionService:
         nationality: str | None = None,
         ethnicity: str | None = None,
         note: str | None = None,
+        # 批次② 核心实体字段补全：登记页 6 个 checkbox + 客源/会员号/担保
+        guest_source_type: str | None = None,
+        member_no: str | None = None,
+        is_vip: bool = False,
+        is_secret: bool = False,
+        is_quick_depart: bool = False,
+        is_print_real_price: bool = True,
+        is_add_point: bool = True,
+        is_guarantee: bool = False,
+        guarantee_hold_until: str | None = None,
     ) -> Booking:
         bs = BookingService(self.session)
         gs = GuestService(self.session)
@@ -87,6 +97,20 @@ class ReceptionService:
             if id_no:
                 booking.id_doc_no = id_no
                 self.session.add(booking)
+            # 批次②：登记页接线字段回写既有预订
+            # guest_source_type 为 NOT NULL（默认 "WI"），页面未填时前端传 null，
+            # 此时保留原值而非写入 null（否则触发 NOT NULL 约束）。
+            if guest_source_type is not None:
+                booking.guest_source_type = guest_source_type
+            booking.member_no = member_no
+            booking.is_vip = is_vip
+            booking.is_secret = is_secret
+            booking.is_quick_depart = is_quick_depart
+            booking.is_print_real_price = is_print_real_price
+            booking.is_add_point = is_add_point
+            booking.is_guarantee = is_guarantee
+            booking.guarantee_hold_until = guarantee_hold_until
+            self.session.add(booking)
             await self.session.flush()
             return await bs.check_in(booking, room_no, operator=operator)
 
@@ -129,6 +153,16 @@ class ReceptionService:
             operator=operator,
             stay_type=stay_type,
             hourly_hours=hourly_hours if stay_type == "hourly" else None,
+            # 批次②：登记页接线字段
+            guest_source_type=guest_source_type,
+            member_no=member_no,
+            is_vip=is_vip,
+            is_secret=is_secret,
+            is_quick_depart=is_quick_depart,
+            is_print_real_price=is_print_real_price,
+            is_add_point=is_add_point,
+            is_guarantee=is_guarantee,
+            guarantee_hold_until=guarantee_hold_until,
         )
         return await bs.check_in(booking, room_no, operator=operator)
 

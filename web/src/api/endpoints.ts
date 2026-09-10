@@ -1056,6 +1056,15 @@ export interface GuestCreateBody {
   tags?: string[] | null;
   notes?: string | null;
   member_id?: number | null;
+  // 批次② 核心实体字段补全
+  en_name?: string | null;
+  native_place?: string | null;
+  nation?: string | null;
+  is_valid?: boolean;
+  come_time?: string | null;
+  head_url?: string | null;
+  id_doc_sign_org?: string | null;
+  id_doc_valid_to?: string | null;
 }
 
 export interface GuestUpdateBody {
@@ -1070,6 +1079,15 @@ export interface GuestUpdateBody {
   tags?: string[] | null;
   notes?: string | null;
   member_id?: number | null;
+  // 批次② 核心实体字段补全
+  en_name?: string | null;
+  native_place?: string | null;
+  nation?: string | null;
+  is_valid?: boolean;
+  come_time?: string | null;
+  head_url?: string | null;
+  id_doc_sign_org?: string | null;
+  id_doc_valid_to?: string | null;
 }
 
 export async function createGuest(
@@ -1412,6 +1430,17 @@ export async function reconcilePay(
 export async function listRateCodes(tenantCode: string): Promise<RateCode[]> {
   const { data } = await http.get<RateCode[]>(
     `/tenants/${tenantCode}/rate-codes`
+  );
+  return data;
+}
+
+export async function createRateCode(
+  tenantCode: string,
+  body: RateCodeCreate
+): Promise<RateCode> {
+  const { data } = await http.post<RateCode>(
+    `/tenants/${tenantCode}/rate-codes`,
+    body
   );
   return data;
 }

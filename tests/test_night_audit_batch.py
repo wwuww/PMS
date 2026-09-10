@@ -16,6 +16,7 @@ tests/test_auto_night_audit.py::test_auto_run_survives_duplicate_checked_in 覆�
 
 from __future__ import annotations
 
+import json
 import sqlite3
 
 from fastapi.testclient import TestClient
@@ -96,10 +97,15 @@ class TestM30T2BatchSemantics:
         amounts = sorted(a for _, a, _ in charges)
         assert amounts == [30000, 30000], charges  # 两间价一致，均按房型基准价
 
-    def test_occupied_without_booking_accumulates_room_rev(
+    def test_occupied_without_booking_not_posted(
         self, client: TestClient
     ) -> None:
-        """无 booking 的在住房：夜审不 500、room_rev 仍按房型价累加、不 KeyError。"""
+        """无 booking 的在住房（无单脏房）：夜审不 500、一律不过账、不计当日房费。
+
+        过账口径（f0a1936 起）以「订单覆盖营业日」为准：房间物理在住但无覆盖本营业日
+        的 CHECKED_IN 订单时，不生成房租、room_revenue 为 0，并作为 occupied_without_booking
+        异常上报前台，而非按房型价累加（避免对无源订单错误计费）。
+        """
         t, h, rt = _seed(client)
         _add_rooms(client, h, rt, ["0101"])
         # 直接把房间翻成在住（无对应 CHECKED_IN 预订）
@@ -113,7 +119,15 @@ class TestM30T2BatchSemantics:
         resp = _night_audit(client, t, h, "2026-10-01")
         assert resp.status_code == 201, resp.text  # 201 Created，不 500
         rep = resp.json()
-        assert rep["room_revenue"] == 30000, rep  # 无 booking 房仍按房型价累加
+        assert rep["room_revenue"] == 0, rep  # 无单脏房一律不过账
+        # 无单脏房异常上报前台（补退房 / 续住 / 超时加收），存于日报 snapshot.before.anomalies
+        snap = json.loads(rep["snapshot"]) if rep.get("snapshot") else {}
+        anomalies = snap.get("before", {}).get("anomalies", [])
+        assert any(
+            a.get("room_no") == "0101"
+            and a.get("type") == "occupied_without_booking"
+            for a in anomalies
+        ), snap
 
     def test_rate_code_specific_beats_generic(self, client: TestClient, tmp_path) -> None:
         """RateCode 折扣生效，且「房型专属优先于通用」的取值顺序正确。

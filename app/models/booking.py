@@ -41,6 +41,9 @@ class Booking(IntPkMixin, TenantMixin, TimestampMixin, Base):
         Index("ix_bookings_hotel_room_status", "hotel_id", "room_no", "status"),
         # order_by(id desc) limit 1 → 索引尾部扫描，免 filesort
         Index("ix_bookings_tenant_room_id", "tenant_id", "room_no", "id"),
+        # 批次②：客源/会员检索
+        Index("ix_bookings_tenant_source", "tenant_id", "guest_source_type"),
+        Index("ix_bookings_tenant_member", "tenant_id", "member_no"),
     )
 
     hotel_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("hotels.id"), nullable=False, index=True)
@@ -73,6 +76,27 @@ class Booking(IntPkMixin, TenantMixin, TimestampMixin, Base):
     link_group_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True, index=True)
     is_link_master: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)  # 主房标记
     hourly_start_time: Mapped[Optional[str]] = mapped_column(String(5), nullable=True)  # M32.17b：钟点房到店时刻 HH:MM，离店=此时刻+hourly_hours
+    # ── 批次② 核心实体字段补全（维也纳字典对齐，全 additive）──
+    guest_source_type: Mapped[str] = mapped_column(String(20), default="WI", nullable=False)  # WI上门/IM个人会员/CM公司会员/LP长包/GP团队/AM中介协议
+    member_no: Mapped[str | None] = mapped_column(String(32), nullable=True)  # 会员号/协议号
+    member_type: Mapped[str | None] = mapped_column(String(32), nullable=True)  # 会员类型
+    is_vip: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)  # VIP
+    is_secret: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)  # 信息保密
+    is_quick_depart: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)  # 无停留离店
+    is_print_real_price: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)  # 打印真价
+    is_add_point: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)  # 计积分
+    is_guarantee: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)  # 是否担保（应触发预授权/押金）
+    guarantee_hold_until: Mapped[str | None] = mapped_column(String(32), nullable=True)  # 最长保留到（ISO8601）
+    guarantor: Mapped[str | None] = mapped_column(String(64), nullable=True)  # 担保人
+    sales_id: Mapped[str | None] = mapped_column(String(64), nullable=True)  # 销售员
+    activity_code: Mapped[str | None] = mapped_column(String(32), nullable=True)  # 活动编号
+    upgrade_room_type_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("room_types.id", name="fk_bookings_upgrade_room_type_id_room_types"), nullable=True)  # 升级房型
+    group_name: Mapped[str | None] = mapped_column(String(128), nullable=True)  # 团队名称
+    group_type: Mapped[str | None] = mapped_column(String(32), nullable=True)  # 团队类型
+    group_leader: Mapped[str | None] = mapped_column(String(64), nullable=True)  # 团队领队
+    group_tel: Mapped[str | None] = mapped_column(String(32), nullable=True)  # 领队电话
+    email: Mapped[str | None] = mapped_column(String(128), nullable=True)  # 邮箱
+    country: Mapped[str | None] = mapped_column(String(64), nullable=True)  # 国家（PSB 涉外上报）
 
     @property
     def companion_list(self) -> list[str]:

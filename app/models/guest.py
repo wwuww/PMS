@@ -12,6 +12,7 @@ from typing import Optional
 
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     Date,
     ForeignKey,
     Index,
@@ -58,6 +59,15 @@ class Guest(IntPkMixin, TenantMixin, TimestampMixin, Base):
     member_id: Mapped[Optional[int]] = mapped_column(
         BigInteger, ForeignKey("members.id"), nullable=True, index=True
     )
+    # ── 批次② 字段补全（维也纳字典对齐，全 additive）──
+    en_name: Mapped[str | None] = mapped_column(String(64), nullable=True)  # 英文名
+    native_place: Mapped[str | None] = mapped_column(String(64), nullable=True)  # 籍贯
+    nation: Mapped[str | None] = mapped_column(String(32), nullable=True)  # 民族
+    is_valid: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)  # 是否有效
+    come_time: Mapped[str | None] = mapped_column(String(32), nullable=True)  # 最近来店时间（ISO8601）
+    head_url: Mapped[str | None] = mapped_column(String(255), nullable=True)  # 头像地址
+    id_doc_sign_org: Mapped[str | None] = mapped_column(String(128), nullable=True)  # 证件签发机关
+    id_doc_valid_to: Mapped[str | None] = mapped_column(String(10), nullable=True)  # 证件有效期至 YYYY-MM-DD
 
     @property
     def tag_list(self) -> list[str]:

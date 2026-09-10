@@ -11,6 +11,7 @@ import {
   Space,
   Table,
   Tag,
+  Switch,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useTenant } from "../store/tenant";
@@ -110,7 +111,7 @@ export default function GuestsPage() {
   const openCreate = () => {
     setEditing(null);
     form.resetFields();
-    form.setFieldsValue({ id_type: "ID", vip_level: "NORMAL" });
+    form.setFieldsValue({ id_type: "ID", vip_level: "NORMAL", is_valid: true });
     setDrawerOpen(true);
   };
 
@@ -128,6 +129,15 @@ export default function GuestsPage() {
       address: g.address ?? "",
       tags: g.tags ?? [],
       notes: g.notes ?? "",
+      // 批次② 核心实体字段补全：回显
+      en_name: g.en_name ?? "",
+      native_place: g.native_place ?? "",
+      nation: g.nation ?? "",
+      is_valid: g.is_valid ?? true,
+      come_time: g.come_time ?? "",
+      head_url: g.head_url ?? "",
+      id_doc_sign_org: g.id_doc_sign_org ?? "",
+      id_doc_valid_to: g.id_doc_valid_to ?? "",
     });
     setDrawerOpen(true);
   };
@@ -148,6 +158,15 @@ export default function GuestsPage() {
           address: v.address || null,
           tags: v.tags || [],
           notes: v.notes || null,
+          // 批次② 核心实体字段补全
+          en_name: v.en_name || null,
+          native_place: v.native_place || null,
+          nation: v.nation || null,
+          is_valid: v.is_valid ?? true,
+          come_time: v.come_time || null,
+          head_url: v.head_url || null,
+          id_doc_sign_org: v.id_doc_sign_org || null,
+          id_doc_valid_to: v.id_doc_valid_to || null,
         });
         message.success("已更新宾客档案");
       } else {
@@ -163,6 +182,15 @@ export default function GuestsPage() {
           address: v.address || null,
           tags: v.tags || [],
           notes: v.notes || null,
+          // 批次② 核心实体字段补全
+          en_name: v.en_name || null,
+          native_place: v.native_place || null,
+          nation: v.nation || null,
+          is_valid: v.is_valid ?? true,
+          come_time: v.come_time || null,
+          head_url: v.head_url || null,
+          id_doc_sign_org: v.id_doc_sign_org || null,
+          id_doc_valid_to: v.id_doc_valid_to || null,
         };
         await createGuest(tenantCode, body);
         message.success("已建档");
@@ -261,6 +289,14 @@ export default function GuestsPage() {
       title: "累计消费",
       dataIndex: "total_spend",
       render: (c: number) => yuan(c),
+    },
+    { title: "英文名", dataIndex: "en_name", render: (v: string | null) => v || "—" },
+    {
+      title: "启用",
+      dataIndex: "is_valid",
+      align: "center" as const,
+      render: (v: boolean | undefined) =>
+        v === false ? <Tag color="default">停用</Tag> : <Tag color="green">启用</Tag>,
     },
     {
       title: "操作",
@@ -375,6 +411,37 @@ export default function GuestsPage() {
           <Form.Item name="notes" label="偏好 / 备注">
             <Input.TextArea rows={3} />
           </Form.Item>
+          {/* 批次② 核心实体字段补全 */}
+          <Space size={12} style={{ display: "flex" }}>
+            <Form.Item name="en_name" label="英文名" style={{ flex: 1 }}>
+              <Input placeholder="English name" maxLength={64} />
+            </Form.Item>
+            <Form.Item name="native_place" label="籍贯" style={{ flex: 1 }}>
+              <Input placeholder="如：广东广州" maxLength={64} />
+            </Form.Item>
+          </Space>
+          <Space size={12} style={{ display: "flex" }}>
+            <Form.Item name="nation" label="民族" style={{ flex: 1 }}>
+              <Input placeholder="如：汉" maxLength={32} />
+            </Form.Item>
+            <Form.Item name="is_valid" label="启用" valuePropName="checked" style={{ flex: 1 }}>
+              <Switch />
+            </Form.Item>
+          </Space>
+          <Form.Item name="come_time" label="到店时间" tooltip="ISO8601 时间字符串，如 2024-01-15T14:00:00">
+            <Input placeholder="YYYY-MM-DDTHH:mm:ss" maxLength={32} />
+          </Form.Item>
+          <Form.Item name="head_url" label="头像URL">
+            <Input placeholder="https://..." maxLength={255} />
+          </Form.Item>
+          <Space size={12} style={{ display: "flex" }}>
+            <Form.Item name="id_doc_sign_org" label="证件签发机关" style={{ flex: 1 }}>
+              <Input placeholder="如：XX公安局" maxLength={64} />
+            </Form.Item>
+            <Form.Item name="id_doc_valid_to" label="证件有效期至" style={{ flex: 1 }}>
+              <Input placeholder="YYYY-MM-DD" maxLength={10} />
+            </Form.Item>
+          </Space>
         </Form>
       </Drawer>
     </div>

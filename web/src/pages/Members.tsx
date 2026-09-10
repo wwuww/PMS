@@ -3,6 +3,7 @@ import {
   Button,
   Card,
   Col,
+  DatePicker,
   Descriptions,
   Form,
   Input,
@@ -15,6 +16,7 @@ import {
   message,
 } from "antd";
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from "@ant-design/icons";
+import dayjs from "dayjs";
 import { useTenant } from "../store/tenant";
 import {
   createMember,
@@ -68,6 +70,10 @@ export default function Members() {
         hotel_id: hotelId,
         name: v.name,
         phone: v.phone,
+        // 批次② 核心实体字段补全
+        member_no: v.member_no || null,
+        card_type: v.card_type || null,
+        join_date: v.join_date ? dayjs(v.join_date).format("YYYY-MM-DD") : null,
       });
       message.success("会员创建成功");
       setShowCreate(false);
@@ -151,6 +157,15 @@ export default function Members() {
                 <Descriptions.Item label="等级">
                   <Tag color="blue">{member.level}</Tag>
                 </Descriptions.Item>
+                <Descriptions.Item label="会员号">
+                  {member.member_no || "—"}
+                </Descriptions.Item>
+                <Descriptions.Item label="卡类型">
+                  {member.card_type || "—"}
+                </Descriptions.Item>
+                <Descriptions.Item label="入会日期">
+                  {member.join_date || "—"}
+                </Descriptions.Item>
                 <Descriptions.Item label="入住次数">
                   {member.stays}
                 </Descriptions.Item>
@@ -218,6 +233,16 @@ export default function Members() {
             rules={[{ required: true, message: "请输入手机号" }]}
           >
             <Input placeholder="11 位手机号" />
+          </Form.Item>
+          {/* 批次② 核心实体字段补全 */}
+          <Form.Item name="member_no" label="会员号">
+            <Input placeholder="会员卡号/会员号" maxLength={64} />
+          </Form.Item>
+          <Form.Item name="card_type" label="卡类型">
+            <Input placeholder="如：金卡/实体卡" maxLength={32} />
+          </Form.Item>
+          <Form.Item name="join_date" label="入会日期">
+            <DatePicker style={{ width: "100%" }} placeholder="选择入会日期" />
           </Form.Item>
         </Form>
       </Modal>

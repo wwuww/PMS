@@ -24,3 +24,7 @@ class Member(IntPkMixin, TenantMixin, TimestampMixin, Base):
     points: Mapped[int] = mapped_column(Integer, default=0)
     stays: Mapped[int] = mapped_column(Integer, default=0)  # 入住次数
     total_spend: Mapped[int] = mapped_column(Integer, default=0)  # 分
+    # ── 批次② 字段补全（维也纳字典对齐，全 additive）──
+    member_no: Mapped[str | None] = mapped_column(String(32), nullable=True)  # 会员号（对外可读编号）
+    card_type: Mapped[str | None] = mapped_column(String(32), nullable=True)  # 卡类型（贵宾/钻石/至尊/绅士）
+    join_date: Mapped[str | None] = mapped_column(String(10), nullable=True)  # 入会日期 YYYY-MM-DD

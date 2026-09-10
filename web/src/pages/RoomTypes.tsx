@@ -10,6 +10,7 @@ import {
   Table,
   Tag,
   Typography,
+  Switch,
   message,
 } from "antd";
 import { PlusOutlined, ReloadOutlined } from "@ant-design/icons";
@@ -58,6 +59,12 @@ export default function RoomTypes() {
         code: v.code,
         name: v.name,
         base_price: Math.round((v.base_price_yuan ?? 0) * 100),
+        // 批次② 核心实体字段补全
+        bed_number: v.bed_number != null ? Number(v.bed_number) : undefined,
+        short_name: v.short_name || null,
+        en_name: v.en_name || null,
+        descript: v.descript || null,
+        is_valid: v.is_valid ?? true,
       };
       await createRoomType(tenantId, body);
       message.success("房型已创建");
@@ -85,6 +92,22 @@ export default function RoomTypes() {
         title: "租户",
         dataIndex: "tenant_id",
         render: (v: string) => <Tag>{v}</Tag>,
+      },
+      {
+        title: "床数",
+        dataIndex: "bed_number",
+        align: "center" as const,
+        render: (v: number | undefined) => (v != null ? v : "—"),
+      },
+      { title: "简称", dataIndex: "short_name", render: (v: string | null) => v || "—" },
+      { title: "英文名", dataIndex: "en_name", render: (v: string | null) => v || "—" },
+      { title: "描述", dataIndex: "descript", render: (v: string | null) => v || "—" },
+      {
+        title: "启用",
+        dataIndex: "is_valid",
+        align: "center" as const,
+        render: (v: boolean | undefined) =>
+          v === false ? <Tag color="default">停用</Tag> : <Tag color="green">启用</Tag>,
       },
     ],
     []
@@ -126,7 +149,7 @@ export default function RoomTypes() {
         okText="保存"
         cancelText="取消"
       >
-        <Form form={form} layout="vertical" initialValues={{ base_price_yuan: 300 }}>
+        <Form form={form} layout="vertical" initialValues={{ base_price_yuan: 300, bed_number: 1, is_valid: true }}>
           <Form.Item
             name="code"
             label="房型代码"
@@ -147,6 +170,21 @@ export default function RoomTypes() {
             rules={[{ required: true, message: "请输入价格" }]}
           >
             <InputNumber style={{ width: "100%" }} min={0} step={10} addonAfter="元" />
+          </Form.Item>
+          <Form.Item name="bed_number" label="床数">
+            <InputNumber style={{ width: "100%" }} min={1} step={1} precision={0} />
+          </Form.Item>
+          <Form.Item name="short_name" label="简称">
+            <Input placeholder="如：豪华大床" maxLength={32} />
+          </Form.Item>
+          <Form.Item name="en_name" label="英文名">
+            <Input placeholder="如：Deluxe King" maxLength={64} />
+          </Form.Item>
+          <Form.Item name="descript" label="描述">
+            <Input.TextArea rows={2} maxLength={255} placeholder="房型描述" />
+          </Form.Item>
+          <Form.Item name="is_valid" label="启用" valuePropName="checked">
+            <Switch />
           </Form.Item>
         </Form>
       </Modal>
