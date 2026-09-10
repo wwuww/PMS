@@ -219,7 +219,7 @@ class TestBookingInHouseOps:
 
         resp = client.post(
             f"/api/v1/tenants/{code}/bookings/{bid}/change-room",
-            json={"new_room_no": "0102"},
+            json={"new_room_no": "0102", "reason": "客人要求"},
         )
         assert resp.status_code == 200, resp.text
         assert resp.json()["room_no"] == "0102"
@@ -238,14 +238,14 @@ class TestBookingInHouseOps:
         # 目标房不能是原房
         resp = client.post(
             f"/api/v1/tenants/{code}/bookings/{bid}/change-room",
-            json={"new_room_no": "0101"},
+            json={"new_room_no": "0101", "reason": "客人要求"},
         )
         assert resp.status_code == 409
 
         # 目标房不存在
         resp = client.post(
             f"/api/v1/tenants/{code}/bookings/{bid}/change-room",
-            json={"new_room_no": "0999"},
+            json={"new_room_no": "0999", "reason": "客人要求"},
         )
         assert resp.status_code == 409
 

@@ -128,6 +128,11 @@ import type {
   ChannelPushLog,
   SearchResult,
   SearchEntityType,
+  Invoice,
+  InvoiceIn as InvoiceInBody,
+  InvoiceVoidIn,
+  RoomChange,
+  StayExtension,
 } from "./types";
 
 export async function listTenants(): Promise<Tenant[]> {
@@ -475,16 +480,17 @@ export async function extendStayBooking(
   return data;
 }
 
-/** 换房：在住房客换至同房型空净房。 */
+/** 换房：在住房客换至同房型空净房；reason 必填（后端 BookingChangeRoomIn.min_length=1）。 */
 export async function changeRoomBooking(
   tenantCode: string,
   bookingId: string,
   newRoomNo: string,
+  reason: string,
   operator = "front_desk"
 ): Promise<Booking> {
   const { data } = await http.post<Booking>(
     `/tenants/${tenantCode}/bookings/${bookingId}/change-room`,
-    { new_room_no: newRoomNo, operator }
+    { new_room_no: newRoomNo, reason, operator }
   );
   return data;
 }
@@ -2645,6 +2651,143 @@ export async function globalSearch(
   const { data } = await http.get<SearchResult>(
     `/tenants/${tenantCode}/search`,
     { params },
+  );
+  return data;
+}
+
+// ---------- M37-3：批次③ 发票 / 换房 / 续住 ----------
+
+/** 开票（POST /tenants/{code}/invoices）。 */
+export async function createInvoice(
+  tenantCode: string,
+  body: InvoiceInBody
+): Promise<Invoice> {
+  const { data } = await http.post<Invoice>(`/tenants/${tenantCode}/invoices`, body);
+  return data;
+}
+
+/** 发票列表（多维筛选 + 分页）。 */
+export async function listInvoices(
+  tenantCode: string,
+  params?: {
+    bill_id?: number | string;
+    booking_id?: number | string;
+    status?: string;
+    limit?: number;
+    offset?: number;
+  }
+): Promise<Invoice[]> {
+  const qs: Record<string, unknown> = {};
+  if (params?.bill_id != null) qs.bill_id = params.bill_id;
+  if (params?.booking_id != null) qs.booking_id = params.booking_id;
+  if (params?.status) qs.status = params.status;
+  if (params?.limit != null) qs.limit = params.limit;
+  if (params?.offset != null) qs.offset = params.offset;
+  const { data } = await http.get<Invoice[]>(`/tenants/${tenantCode}/invoices`, {
+    params: qs,
+  });
+  return data;
+}
+
+/** 单张发票详情。 */
+export async function getInvoice(
+  tenantCode: string,
+  id: number | string
+): Promise<Invoice> {
+  const { data } = await http.get<Invoice>(
+    `/tenants/${tenantCode}/invoices/${id}`
+  );
+  return data;
+}
+
+/** 作废发票（WORM 仅置 status=VOID）。 */
+export async function voidInvoice(
+  tenantCode: string,
+  id: number | string,
+  body: InvoiceVoidIn = {}
+): Promise<Invoice> {
+  const { data } = await http.post<Invoice>(
+    `/tenants/${tenantCode}/invoices/${id}/void`,
+    body
+  );
+  return data;
+}
+
+/** 按账单列出所有发票（前台收银 → 查看发票用）。 */
+export async function listInvoicesByBill(
+  tenantCode: string,
+  billId: number | string
+): Promise<Invoice[]> {
+  const { data } = await http.get<Invoice[]>(
+    `/tenants/${tenantCode}/bills/${billId}/invoices`
+  );
+  return data;
+}
+
+/** 换房记录列表（多维筛选 + 分页）。 */
+export async function listRoomChanges(
+  tenantCode: string,
+  params?: {
+    booking_id?: number | string;
+    room_no?: string;
+    business_date?: string;
+    limit?: number;
+    offset?: number;
+  }
+): Promise<RoomChange[]> {
+  const qs: Record<string, unknown> = {};
+  if (params?.booking_id != null) qs.booking_id = params.booking_id;
+  if (params?.room_no) qs.room_no = params.room_no;
+  if (params?.business_date) qs.business_date = params.business_date;
+  if (params?.limit != null) qs.limit = params.limit;
+  if (params?.offset != null) qs.offset = params.offset;
+  const { data } = await http.get<RoomChange[]>(
+    `/tenants/${tenantCode}/room-changes`,
+    { params: qs }
+  );
+  return data;
+}
+
+/** 按预订 ID 列出换房记录（登记入住 → 换房流水用）。 */
+export async function listRoomChangesByBooking(
+  tenantCode: string,
+  bookingId: number | string
+): Promise<RoomChange[]> {
+  const { data } = await http.get<RoomChange[]>(
+    `/tenants/${tenantCode}/bookings/${bookingId}/room-changes`
+  );
+  return data;
+}
+
+/** 续住记录列表（多维筛选 + 分页）。 */
+export async function listStayExtensions(
+  tenantCode: string,
+  params?: {
+    booking_id?: number | string;
+    business_date?: string;
+    limit?: number;
+    offset?: number;
+  }
+): Promise<StayExtension[]> {
+  const qs: Record<string, unknown> = {};
+  if (params?.booking_id != null) qs.booking_id = params.booking_id;
+  if (params?.business_date) qs.business_date = params.business_date;
+  if (params?.limit != null) qs.limit = params.limit;
+  if (params?.offset != null) qs.offset = params.offset;
+  const { data } = await http.get<StayExtension[]>(
+    `/tenants/${tenantCode}/stay-extensions`,
+    { params: qs }
+  );
+  return data;
+}
+
+/** 按预订 ID 列出续住记录（登记入住 → 续住流水用）。 */
+export async function listStayExtensionsByBooking(
+  tenantCode: string,
+  bookingId: number | string
+): Promise<StayExtension[]> {
+  const { data } = await http.get<StayExtension[]>(
+    `/tenants/${tenantCode}/bookings/${bookingId}/stay-extensions`
   );
   return data;
 }

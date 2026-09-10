@@ -25,6 +25,8 @@ DEPOSIT_REFUND = "deposit.refund"     # 退押（原路退/手动退）
 # M29 OTA 直连
 OTA_MANAGE = "ota.manage"             # 渠道配置 / 房型映射 / 推送
 RATE_EDIT = "rate.edit"               # 渠道价 / 公共价编辑
+# M37-③ 发票
+INVOICE_MANAGE = "invoice.manage"     # 开票 / 作废 / 查 / 按账单查
 
 ALL_PERMISSIONS = {
     PRICE_EDIT,
@@ -41,6 +43,7 @@ ALL_PERMISSIONS = {
     DEPOSIT_REFUND,
     OTA_MANAGE,
     RATE_EDIT,
+    INVOICE_MANAGE,
 }
 
 
@@ -70,6 +73,7 @@ DEFAULT_ROLES: list[tuple[str, str, bool, list[str]]] = [
             DEPOSIT_REFUND,
             OTA_MANAGE,
             RATE_EDIT,
+            INVOICE_MANAGE,
         ],
     ),
     (
@@ -83,6 +87,7 @@ DEFAULT_ROLES: list[tuple[str, str, bool, list[str]]] = [
             FNB_MANAGE,
             DEPOSIT_MANAGE,
             DEPOSIT_REFUND,
+            INVOICE_MANAGE,
         ],
     ),
 ]

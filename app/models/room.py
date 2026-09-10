@@ -65,3 +65,36 @@ class RoomStateEvent(IntPkMixin, TenantMixin, Base):
     trigger: Mapped[str] = mapped_column(String(24), nullable=False)
     operator: Mapped[str] = mapped_column(String(64), default="system")
     occurred_at: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+
+
+class RoomChange(IntPkMixin, TenantMixin, TimestampMixin, Base):
+    """换房记录（M37-③）。
+
+    每次 ``booking_service.change_room`` 落一条 WORM 记录（不删不改为营改/审计刚需）。
+    ``price_diff_cents = to_price - from_price``，> 0 时由 service 写 ``BillItem(ROOM_CHARGE)``
+    差价入账并累加 ``Bill.balance``（与夜审房费过账口径一致）。
+    """
+
+    __tablename__ = "room_changes"
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "change_no", name="uq_room_changes_tenant_change_no"),
+        Index("ix_room_changes_tenant_booking", "tenant_id", "booking_id"),
+        Index("ix_room_changes_tenant_from_room", "tenant_id", "from_room_no"),
+        Index("ix_room_changes_tenant_bizdate", "tenant_id", "business_date"),
+    )
+
+    hotel_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("hotels.id"), nullable=False)
+    change_no: Mapped[str] = mapped_column(String(32), nullable=False)  # 变更号（租户内唯一）
+    booking_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("bookings.id"), nullable=False)
+    bill_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("bills.id"), nullable=True)
+    from_room_no: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    to_room_no: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    from_room_type_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    to_room_type_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    from_price_cents: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    to_price_cents: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    price_diff_cents: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    reason: Mapped[str] = mapped_column(String(64), nullable=False)  # 换房原因（审计刚需）
+    business_date: Mapped[str] = mapped_column(String(10), nullable=False)  # 营业日
+    operator: Mapped[str] = mapped_column(String(64), nullable=False, default="front_desk")

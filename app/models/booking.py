@@ -121,3 +121,31 @@ class Booking(IntPkMixin, TenantMixin, TimestampMixin, Base):
         from datetime import date
 
         return (date(y2, m2, d2) - date(y1, m1, d1)).days
+
+
+class StayExtension(IntPkMixin, TenantMixin, TimestampMixin, Base):
+    """续住记录（M37-③）。
+
+    每次 ``booking_service.extend_stay`` 落一条 WORM 记录（``is_valid`` 撤销置 false，
+    不物理删）。``added_amount_cents`` 为本次续住新增房费（分），存在 OPEN 账单时由
+    service 写 ``BillItem(ROOM_CHARGE, +added_amount)`` 累加 ``Bill.balance``。
+    """
+
+    __tablename__ = "stay_extensions"
+
+    __table_args__ = (
+        Index("ix_stay_ext_tenant_booking", "tenant_id", "booking_id"),
+        Index("ix_stay_ext_tenant_bizdate", "tenant_id", "business_date"),
+    )
+
+    hotel_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("hotels.id"), nullable=False)
+    booking_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("bookings.id"), nullable=False)
+    room_no: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    bill_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("bills.id"), nullable=True)
+    business_date: Mapped[str] = mapped_column(String(10), nullable=False)
+    start_date: Mapped[str] = mapped_column(String(10), nullable=False)
+    end_date: Mapped[str] = mapped_column(String(10), nullable=False)
+    nights: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    added_amount_cents: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    is_valid: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    operator: Mapped[str] = mapped_column(String(64), nullable=False, default="front_desk")

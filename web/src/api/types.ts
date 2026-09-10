@@ -1715,3 +1715,103 @@ export interface SearchResult {
   by_type: Record<string, number>;
   query: string;
 }
+
+// ---------- 批次③：发票 + 换房 + 续住（M37-3） ----------
+
+/** 发票主记录。money 字段单位：分（cents）。 */
+export interface Invoice {
+  id?: number | string;
+  tenant_id?: string;
+  hotel_id?: number | string;
+  invoice_no?: string;
+  bill_id?: number | string | null;
+  booking_id?: number | string | null;
+  room_no?: string | null;
+  guest_name?: string | null;
+  agreement_no?: string | null;
+  check_in_at?: string | null;
+  check_out_at?: string;
+  check_in_type?: string | null;
+  consume_amount_cents?: number;
+  invoice_amount_cents?: number;
+  invoice_type?: string; // NORMAL | VAT_SPECIAL | ELECTRONIC
+  title?: string | null;
+  tax_no?: string | null;
+  approver?: string | null;
+  work_shift?: string | null;
+  flag?: string;
+  status?: string; // ISSUED | VOID
+  operator?: string;
+  memo?: string | null;
+  is_valid?: boolean;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+/** 发票开票入参（不含 id/tenant_id/created_at/updated_at；invoice_no 可选，后端自动生成）。 */
+export interface InvoiceIn {
+  invoice_no?: string | null;
+  bill_id?: number | string | null;
+  booking_id?: number | string | null;
+  room_no?: string | null;
+  guest_name?: string | null;
+  agreement_no?: string | null;
+  check_in_at?: string | null;
+  check_out_at: string;
+  check_in_type?: string | null;
+  consume_amount_cents: number;
+  invoice_amount_cents: number;
+  invoice_type?: string;
+  title?: string | null;
+  tax_no?: string | null;
+  approver?: string | null;
+  work_shift?: string | null;
+  flag?: string;
+  memo?: string | null;
+  operator?: string;
+}
+
+/** 作废发票入参（reason 可选；operator 默认 front_desk）。 */
+export interface InvoiceVoidIn {
+  reason?: string | null;
+  operator?: string;
+}
+
+/** 换房记录。price_diff_cents 单位：分。 */
+export interface RoomChange {
+  id?: number | string;
+  tenant_id?: string;
+  hotel_id?: number | string;
+  change_no?: string;
+  booking_id?: number | string;
+  bill_id?: number | string | null;
+  from_room_no?: string | null;
+  to_room_no?: string | null;
+  from_room_type_id?: number | string | null;
+  to_room_type_id?: number | string | null;
+  from_price_cents?: number | null;
+  to_price_cents?: number | null;
+  price_diff_cents?: number;
+  reason?: string;
+  business_date?: string;
+  operator?: string;
+  created_at?: string | null;
+}
+
+/** 续住记录。added_amount_cents 单位：分。 */
+export interface StayExtension {
+  id?: number | string;
+  tenant_id?: string;
+  hotel_id?: number | string;
+  booking_id?: number | string;
+  room_no?: string | null;
+  bill_id?: number | string | null;
+  business_date?: string;
+  start_date?: string;
+  end_date?: string;
+  nights?: number;
+  added_amount_cents?: number;
+  is_valid?: boolean;
+  operator?: string;
+  created_at?: string | null;
+}

@@ -238,7 +238,12 @@ export default function ReceptionWorkbenchPage() {
         );
         message.success("续住已生效");
       } else {
-        await changeRoomBooking(tenantCode, String(ctx.booking.id), v.new_room_no);
+        await changeRoomBooking(
+          tenantCode,
+          String(ctx.booking.id),
+          v.new_room_no,
+          v.change_reason || "客人要求"
+        );
         message.success("换房已生效");
       }
       setR4Type(null);
@@ -681,18 +686,36 @@ export default function ReceptionWorkbenchPage() {
             </Form.Item>
           )}
           {r4Type === "change" && (
-            <Form.Item name="new_room_no" label="目标房号" rules={[{ required: true, message: "请选择目标房号" }]}>
-              <Select
-                showSearch
-                placeholder="选择可排房（空净 / 锁房）"
-                options={assignableRooms
-                  .filter((r) => r.room_no !== ctx?.room_no)
-                  .map((r) => ({
-                    value: r.room_no,
-                    label: `${r.room_no} · ${ROOM_STATE_LABELS[r.state]}`,
-                  }))}
-              />
-            </Form.Item>
+            <>
+              <Form.Item name="new_room_no" label="目标房号" rules={[{ required: true, message: "请选择目标房号" }]}>
+                <Select
+                  showSearch
+                  placeholder="选择可排房（空净 / 锁房）"
+                  options={assignableRooms
+                    .filter((r) => r.room_no !== ctx?.room_no)
+                    .map((r) => ({
+                      value: r.room_no,
+                      label: `${r.room_no} · ${ROOM_STATE_LABELS[r.state]}`,
+                    }))}
+                />
+              </Form.Item>
+              <Form.Item
+                name="change_reason"
+                label="换房原因"
+                rules={[{ required: true, message: "请选择换房原因" }]}
+                initialValue="客人要求"
+              >
+                <Select
+                  options={[
+                    { value: "客人要求", label: "客人要求" },
+                    { value: "设施故障", label: "设施故障" },
+                    { value: "升级", label: "升级" },
+                    { value: "噪音", label: "噪音" },
+                    { value: "其他", label: "其他" },
+                  ]}
+                />
+              </Form.Item>
+            </>
           )}
         </Form>
       </Modal>

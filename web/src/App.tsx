@@ -46,6 +46,7 @@ import Complaints from "./pages/Complaints";
 import ArAccounts from "./pages/ArAccounts";
 import Deposits from "./pages/Deposits";
 import CheckInRegister from "./pages/CheckInRegister";
+import Invoices from "./pages/Invoices";
 
 /**
  * 布局内路由表（供 AppLayout 选项卡 keep-alive 渲染复用）。
@@ -97,6 +98,7 @@ export const layoutRoutes: RouteObject[] = [
   { path: "check-in-register", element: <CheckInRegister /> },
   { path: "guests", element: <Guests /> },
   { path: "analytics", element: <Analytics /> },
+  { path: "invoices", element: <Invoices /> },
   { path: "*", element: <NotFound /> },
 ];
 

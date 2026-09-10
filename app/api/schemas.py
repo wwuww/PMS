@@ -293,10 +293,117 @@ class BookingExtendIn(BaseModel):
 
 
 class BookingChangeRoomIn(BaseModel):
-    """换房：目标房号 + 操作员。"""
+    """换房：目标房号 + 换房原因（必填，审计刚需）+ 操作员。"""
 
     new_room_no: str = Field(min_length=1, max_length=16)
+    reason: str = Field(min_length=1, max_length=64)
     operator: str = "front_desk"
+
+
+# ---------- M37-③ 发票 + 换房记录 + 续住记录 ----------
+
+
+class InvoiceIn(BaseModel):
+    """开票入参：消费/开票额必填（分），专票必填税号，差额>¥10 必填审批人。"""
+
+    invoice_no: str | None = Field(default=None, max_length=32)  # 不传则后端自动生成
+    bill_id: int | None = None
+    booking_id: int | None = None
+    room_no: str | None = Field(default=None, max_length=16)
+    guest_name: str | None = Field(default=None, max_length=128)
+    agreement_no: str | None = Field(default=None, max_length=32)
+    check_in_at: str | None = Field(default=None, max_length=32)
+    check_out_at: str = Field(min_length=1, max_length=32)
+    check_in_type: str | None = Field(default=None, max_length=16)
+    consume_amount_cents: int = Field(default=0, ge=0)
+    invoice_amount_cents: int = Field(default=0, ge=0)
+    invoice_type: str = Field(default="NORMAL", max_length=16)  # NORMAL|VAT_SPECIAL|ELECTRONIC
+    title: str | None = Field(default=None, max_length=128)
+    tax_no: str | None = Field(default=None, max_length=64)
+    approver: str | None = Field(default=None, max_length=64)
+    work_shift: str | None = Field(default=None, max_length=50)
+    flag: str = Field(default="1", max_length=1)
+    memo: str | None = Field(default=None, max_length=255)
+    operator: str = "front_desk"
+
+
+class InvoiceOut(BaseModel):
+    model_config = {"from_attributes": True}
+
+    id: int
+    tenant_id: str
+    hotel_id: int
+    invoice_no: str
+    bill_id: int | None = None
+    booking_id: int | None = None
+    room_no: str | None = None
+    guest_name: str | None = None
+    agreement_no: str | None = None
+    check_in_at: str | None = None
+    check_out_at: str
+    check_in_type: str | None = None
+    consume_amount_cents: int = 0
+    invoice_amount_cents: int = 0
+    invoice_type: str = "NORMAL"
+    title: str | None = None
+    tax_no: str | None = None
+    approver: str | None = None
+    work_shift: str | None = None
+    flag: str = "1"
+    status: str = "ISSUED"
+    operator: str = "front_desk"
+    memo: str | None = None
+    is_valid: bool = True
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class InvoiceVoidIn(BaseModel):
+    """作废发票：WORM，仅置 status=VOID，不改金额。"""
+
+    reason: str | None = Field(default=None, max_length=255)
+    operator: str = "front_desk"
+
+
+class RoomChangeOut(BaseModel):
+    model_config = {"from_attributes": True}
+
+    id: int
+    tenant_id: str
+    hotel_id: int
+    change_no: str
+    booking_id: int
+    bill_id: int | None = None
+    from_room_no: str | None = None
+    to_room_no: str | None = None
+    from_room_type_id: int | None = None
+    to_room_type_id: int | None = None
+    from_price_cents: int | None = None
+    to_price_cents: int | None = None
+    price_diff_cents: int = 0
+    reason: str
+    business_date: str
+    operator: str = "front_desk"
+    created_at: datetime | None = None
+
+
+class StayExtensionOut(BaseModel):
+    model_config = {"from_attributes": True}
+
+    id: int
+    tenant_id: str
+    hotel_id: int
+    booking_id: int
+    room_no: str | None = None
+    bill_id: int | None = None
+    business_date: str
+    start_date: str
+    end_date: str
+    nights: int = 0
+    added_amount_cents: int = 0
+    is_valid: bool = True
+    operator: str = "front_desk"
+    created_at: datetime | None = None
 
 
 class BookingExtrasIn(BaseModel):

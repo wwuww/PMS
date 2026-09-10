@@ -51,8 +51,10 @@ import {
   settleToMaster,
   listRoomStateEvents,
   listBookingLogs,
+  listRoomChangesByBooking,
+  listStayExtensionsByBooking,
 } from "../api/endpoints";
-import type { Room, RoomType, Booking } from "../api/types";
+import type { Room, RoomType, Booking, RoomChange, StayExtension } from "../api/types";
 import { useTenant } from "../store/tenant";
 import { ROOM_STATE_LABELS, TRIGGER_LABELS } from "../domain/roomActions";
 import { fmtCents } from "../utils/format";
@@ -77,6 +79,15 @@ const GUEST_SOURCE_OPTIONS = [
   { value: "LP", label: "长包" },
   { value: "GP", label: "团队" },
   { value: "AM", label: "中介协议" },
+];
+
+// 批次③：换房原因选项
+const CHANGE_ROOM_REASONS = [
+  { value: "客人要求", label: "客人要求" },
+  { value: "设施故障", label: "设施故障" },
+  { value: "升级", label: "升级" },
+  { value: "噪音", label: "噪音" },
+  { value: "其他", label: "其他" },
 ];
 
 /** 分区标题：蓝/红小节标题 */
@@ -127,9 +138,19 @@ export default function CheckInRegister() {
   const [newCheckOut, setNewCheckOut] = useState<Dayjs | null>(null);
   const [changeOpen, setChangeOpen] = useState(false);
   const [newRoomNo, setNewRoomNo] = useState<string | null>(null);
+  const [changeReason, setChangeReason] = useState<string | undefined>(undefined);
   const [compOpen, setCompOpen] = useState(false);
   const [compInput, setCompInput] = useState("");
   const [acting, setActing] = useState(false);
+
+  // 批次③：在住单换房/续住记录
+  const [roomChanges, setRoomChanges] = useState<RoomChange[]>([]);
+  const [roomChangesLoading, setRoomChangesLoading] = useState(false);
+  const [stayExtensions, setStayExtensions] = useState<StayExtension[]>([]);
+  const [stayExtensionsLoading, setStayExtensionsLoading] = useState(false);
+  // 最新一次续住回显（续住成功后即时提示用户）
+  const [latestExtension, setLatestExtension] = useState<StayExtension | null>(null);
+  const [latestChange, setLatestChange] = useState<RoomChange | null>(null);
 
   // 客人登记信息
   const [form, setForm] = useState({
@@ -314,6 +335,53 @@ export default function CheckInRegister() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [topTab, roomNo, logBooking?.id]);
 
+  // 批次③：加载该登记单的换房记录 + 续住记录（在住模式下）
+  const loadRoomChangeLog = useCallback(
+    async (bookingIdVal: number | string) => {
+      if (!tenantCode) return;
+      setRoomChangesLoading(true);
+      try {
+        const list = await listRoomChangesByBooking(tenantCode, String(bookingIdVal));
+        setRoomChanges(list);
+      } catch (e: unknown) {
+        message.error((e as Error).message || "加载换房记录失败");
+        setRoomChanges([]);
+      } finally {
+        setRoomChangesLoading(false);
+      }
+    },
+    [tenantCode]
+  );
+
+  const loadStayExtensionLog = useCallback(
+    async (bookingIdVal: number | string) => {
+      if (!tenantCode) return;
+      setStayExtensionsLoading(true);
+      try {
+        const list = await listStayExtensionsByBooking(tenantCode, String(bookingIdVal));
+        setStayExtensions(list);
+      } catch (e: unknown) {
+        message.error((e as Error).message || "加载续住记录失败");
+        setStayExtensions([]);
+      } finally {
+        setStayExtensionsLoading(false);
+      }
+    },
+    [tenantCode]
+  );
+
+  // 在住单变化时刷新换房/续住记录
+  useEffect(() => {
+    if (!stayBooking) {
+      setRoomChanges([]);
+      setStayExtensions([]);
+      return;
+    }
+    loadRoomChangeLog(stayBooking.id);
+    loadStayExtensionLog(stayBooking.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stayBooking?.id]);
+
   const nights = useMemo(() => {
     const diff = form.check_out_date.diff(dayjs().startOf("day"), "day");
     return diff > 0 ? diff : 1;
@@ -388,6 +456,14 @@ export default function CheckInRegister() {
       await extendStayBooking(tenantCode, String(stayBooking.id), newCheckOut.format("YYYY-MM-DD"));
       message.success(`续住成功，预离延至 ${newCheckOut.format("YYYY-MM-DD")}`);
       setExtendOpen(false);
+      // 批次③：刷新续住记录，并把最新一条置顶
+      await loadStayExtensionLog(stayBooking.id);
+      try {
+        const list = await listStayExtensionsByBooking(tenantCode, String(stayBooking.id));
+        if (list.length) setLatestExtension(list[0]);
+      } catch {
+        /* noop */
+      }
       reload();
     } catch (e: unknown) {
       message.error((e as Error).message);
@@ -398,13 +474,32 @@ export default function CheckInRegister() {
 
   const doChangeRoom = async () => {
     if (!stayBooking || !newRoomNo) return;
+    if (!changeReason) {
+      message.error("请选择换房原因");
+      return;
+    }
     setActing(true);
     try {
-      await changeRoomBooking(tenantCode, String(stayBooking.id), newRoomNo);
+      await changeRoomBooking(
+        tenantCode,
+        String(stayBooking.id),
+        newRoomNo,
+        changeReason
+      );
       message.success(`换房成功：${stayBooking.room_no} → ${newRoomNo}`);
       setChangeOpen(false);
+      setNewRoomNo(null);
+      setChangeReason(undefined);
       setRoomNo(newRoomNo);
       window.history.replaceState(null, "", `/check-in-register?room_no=${newRoomNo}`);
+      // 批次③：刷新换房记录，最新一条置顶
+      await loadRoomChangeLog(stayBooking.id);
+      try {
+        const list = await listRoomChangesByBooking(tenantCode, String(stayBooking.id));
+        if (list.length) setLatestChange(list[0]);
+      } catch {
+        /* noop */
+      }
       reload();
     } catch (e: unknown) {
       message.error((e as Error).message);
@@ -558,6 +653,7 @@ export default function CheckInRegister() {
           "换房/升级(H)",
           () => {
             setNewRoomNo(null);
+            setChangeReason(undefined);
             setChangeOpen(true);
           },
           !isStay
@@ -997,6 +1093,96 @@ export default function CheckInRegister() {
     "booking.noshow": "未到标记",
   };
 
+  // 批次③：换房/续住记录 tab
+  const stayRecordsTab = (
+    <div className="pms-panel" style={{ padding: "12px 16px" }}>
+      <SectionTitle text="换房记录" extra={
+        latestChange ? <Tag color="blue">最新：{latestChange.from_room_no} → {latestChange.to_room_no}</Tag> : null
+      } />
+      <Table<RoomChange>
+        size="small"
+        loading={roomChangesLoading}
+        rowKey="id"
+        pagination={{ pageSize: 5, showSizeChanger: false }}
+        dataSource={roomChanges}
+        locale={{ emptyText: "该登记单暂无换房记录" }}
+        columns={[
+          {
+            title: "时间",
+            dataIndex: "created_at",
+            width: 160,
+            render: (v: string) => (v ? v.replace("T", " ").slice(0, 19) : "—"),
+          },
+          {
+            title: "原房号 → 新房号",
+            width: 200,
+            render: (_, r) => (
+              <span>
+                <Tag>{r.from_room_no ?? "—"}</Tag>
+                <span style={{ margin: "0 4px" }}>→</span>
+                <Tag color="blue">{r.to_room_no ?? "—"}</Tag>
+              </span>
+            ),
+          },
+          {
+            title: "差价（元）",
+            dataIndex: "price_diff_cents",
+            width: 110,
+            render: (v: number) => fmtCents(v ?? 0),
+          },
+          { title: "原因", dataIndex: "reason", render: (v: string) => v || "—" },
+          { title: "操作人", dataIndex: "operator", width: 110 },
+        ]}
+      />
+
+      <div style={{ height: 1, background: "#f2f4f7", margin: "16px 0" }} />
+
+      <SectionTitle text="续住记录" extra={
+        latestExtension ? <Tag color="blue">最新延长至 {latestExtension.end_date}（+{latestExtension.nights ?? 0} 晚）</Tag> : null
+      } />
+      <Table<StayExtension>
+        size="small"
+        loading={stayExtensionsLoading}
+        rowKey="id"
+        pagination={{ pageSize: 5, showSizeChanger: false }}
+        dataSource={stayExtensions}
+        locale={{ emptyText: "该登记单暂无续住记录" }}
+        columns={[
+          {
+            title: "时间",
+            dataIndex: "created_at",
+            width: 160,
+            render: (v: string) => (v ? v.replace("T", " ").slice(0, 19) : "—"),
+          },
+          {
+            title: "起始日 → 截止日",
+            width: 230,
+            render: (_, r) => (
+              <span>
+                <Tag>{r.start_date ?? "—"}</Tag>
+                <span style={{ margin: "0 4px" }}>→</span>
+                <Tag color="blue">{r.end_date ?? "—"}</Tag>
+              </span>
+            ),
+          },
+          {
+            title: "新增间夜",
+            dataIndex: "nights",
+            width: 90,
+            render: (v: number) => v ?? 0,
+          },
+          {
+            title: "新增金额（元）",
+            dataIndex: "added_amount_cents",
+            width: 130,
+            render: (v: number) => fmtCents(v ?? 0),
+          },
+          { title: "操作人", dataIndex: "operator", width: 110 },
+        ]}
+      />
+    </div>
+  );
+
   const logTab = (
     <div className="pms-panel" style={{ padding: "12px 16px" }}>
       <SectionTitle
@@ -1101,6 +1287,7 @@ export default function CheckInRegister() {
           { key: "info", label: "基本信息(1)", children: infoTab },
           { key: "folio", label: "账务信息(2)", children: folioTab },
           { key: "log", label: "操作日志(3)", children: logTab },
+          { key: "stay-records", label: "换房/续住(4)", children: stayRecordsTab },
         ]}
       />
 
@@ -1123,21 +1310,40 @@ export default function CheckInRegister() {
         title={`换房 · ${stayBooking?.room_no || ""} ${stayBooking?.guest_name || ""}`}
         open={changeOpen}
         onOk={doChangeRoom}
-        onCancel={() => setChangeOpen(false)}
+        onCancel={() => {
+          setChangeOpen(false);
+          setNewRoomNo(null);
+          setChangeReason(undefined);
+        }}
         confirmLoading={acting}
         okText="确认换房"
-        width={380}
+        width={420}
       >
-        <Select
-          style={{ width: "100%" }}
-          placeholder="选择目标空净房"
-          value={newRoomNo ?? undefined}
-          onChange={(v) => setNewRoomNo(v)}
-          options={changeTargets.map((r) => ({
-            value: r.room_no,
-            label: `${r.room_no} · ${roomTypes.find((rt) => String(rt.id) === String(r.room_type_id))?.name ?? ""}`,
-          }))}
-        />
+        <div style={{ marginBottom: 8 }}>
+          <div style={{ marginBottom: 4 }}>目标房号</div>
+          <Select
+            style={{ width: "100%" }}
+            placeholder="选择目标空净房"
+            value={newRoomNo ?? undefined}
+            onChange={(v) => setNewRoomNo(v)}
+            options={changeTargets.map((r) => ({
+              value: r.room_no,
+              label: `${r.room_no} · ${roomTypes.find((rt) => String(rt.id) === String(r.room_type_id))?.name ?? ""}`,
+            }))}
+          />
+        </div>
+        <div>
+          <div style={{ marginBottom: 4 }}>
+            <Typography.Text type="danger">* </Typography.Text>换房原因（必填）
+          </div>
+          <Select
+            style={{ width: "100%" }}
+            placeholder="选择换房原因"
+            value={changeReason}
+            onChange={(v) => setChangeReason(v)}
+            options={CHANGE_ROOM_REASONS}
+          />
+        </div>
       </Modal>
 
       {/* 增加随行人弹窗 */}

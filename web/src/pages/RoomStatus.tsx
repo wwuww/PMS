@@ -100,6 +100,7 @@ export default function RoomStatusPage() {
   const [extActing, setExtActing] = useState(false);
   const [swapOpen, setSwapOpen] = useState(false);
   const [swapRoomNo, setSwapRoomNo] = useState<string | null>(null);
+  const [swapReason, setSwapReason] = useState<string>("客人要求");
   const [swapActing, setSwapActing] = useState(false);
 
   // 经典房态盘（参考维也纳 PMS 5.0）：状态过滤 / 房型 Tab / 视图模式 / 在住客映射
@@ -631,7 +632,7 @@ export default function RoomStatusPage() {
     if (!dtBooking || !swapRoomNo) return;
     setSwapActing(true);
     try {
-      await changeRoomBooking(tenantCode, dtBooking.id, swapRoomNo);
+      await changeRoomBooking(tenantCode, dtBooking.id, swapRoomNo, swapReason);
       message.success(`预订 #${dtBooking.id} 已换房至 ${swapRoomNo}`);
       setSwapOpen(false);
       setDtRoom(null);
@@ -1348,6 +1349,23 @@ export default function RoomStatusPage() {
             )
             .map((r) => ({ value: r.room_no, label: `${r.room_no}（空净）` }))}
         />
+        <div style={{ marginTop: 12 }}>
+          <Typography.Text strong style={{ display: "block", marginBottom: 4 }}>
+            换房原因（必填）
+          </Typography.Text>
+          <Select
+            style={{ width: "100%" }}
+            value={swapReason}
+            onChange={setSwapReason}
+            options={[
+              { value: "客人要求", label: "客人要求" },
+              { value: "设施故障", label: "设施故障" },
+              { value: "升级", label: "升级" },
+              { value: "噪音", label: "噪音" },
+              { value: "其他", label: "其他" },
+            ]}
+          />
+        </div>
       </Modal>
 
       {/* 在住房间：附加服务（加床 / 同住人） */}

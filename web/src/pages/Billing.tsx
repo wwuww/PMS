@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import {
   Button,
   Card,
+  DatePicker,
   Descriptions,
   Drawer,
   Form,
@@ -10,6 +11,7 @@ import {
   InputNumber,
   Modal,
   Popconfirm,
+  Radio,
   Segmented,
   Select,
   Space,
@@ -20,7 +22,8 @@ import {
   message,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { ReloadOutlined, PlusOutlined, EyeOutlined } from "@ant-design/icons";
+import { ReloadOutlined, PlusOutlined, EyeOutlined, FileDoneOutlined } from "@ant-design/icons";
+import dayjs from "dayjs";
 import { useTenant } from "../store/tenant";
 import {
   listBills,
@@ -31,13 +34,26 @@ import {
   settleBill,
   refundBill,
   applyPrepay,
+  createInvoice,
+  listInvoicesByBill,
 } from "../api/endpoints";
 import type {
   Bill,
   BillSource,
   ChargeType,
+  Invoice,
   PaymentMethod,
 } from "../api/types";
+import { currentOperator, useCan } from "../utils/permission";
+
+// 后端阈值：开票额 - 消费额 > 1000 分（即 ¥10）时 approver 必填
+const INVOICE_APPROVER_THRESHOLD = 1000;
+
+const INVOICE_TYPE_OPTIONS = [
+  { value: "NORMAL", label: "普票" },
+  { value: "VAT_SPECIAL", label: "专票" },
+  { value: "ELECTRONIC", label: "电子票" },
+];
 
 const { Title, Text } = Typography;
 
@@ -98,6 +114,8 @@ export default function Billing() {
   const [loading, setLoading] = useState(false);
   const [sourceFilter, setSourceFilter] = useState<string>("ALL");
 
+  const canManageInvoice = useCan("INVOICE_MANAGE");
+
   const [openId, setOpenId] = useState<string | null>(null);
   const [detail, setDetail] = useState<Bill | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -108,6 +126,22 @@ export default function Billing() {
   const [showRefund, setShowRefund] = useState(false);
   const [refundForm] = Form.useForm();
   const [refundBusy, setRefundBusy] = useState(false);
+
+  // 批次③：开票弹窗 + 按账单查发票记录
+  const [invoiceOpen, setInvoiceOpen] = useState(false);
+  const [invoiceForm] = Form.useForm();
+  const [invoiceBusy, setInvoiceBusy] = useState(false);
+  const [existingInvoices, setExistingInvoices] = useState<Invoice[]>([]);
+  const [existingInvoicesLoading, setExistingInvoicesLoading] = useState(false);
+  // 监听开票金额 → 计算是否需要审批人
+  const watchConsume = Form.useWatch("consume_amount_cents", invoiceForm);
+  const watchInvoice = Form.useWatch("invoice_amount_cents", invoiceForm);
+  const watchType = Form.useWatch("invoice_type", invoiceForm);
+  const requireApprover = useMemo(() => {
+    const c = Number(watchConsume || 0);
+    const i = Number(watchInvoice || 0);
+    return i - c > INVOICE_APPROVER_THRESHOLD;
+  }, [watchConsume, watchInvoice]);
 
   const refresh = useCallback(async () => {
     if (!tenantCode) return;
@@ -269,6 +303,94 @@ export default function Billing() {
       await refresh();
     } catch (e: any) {
       message.error(e?.response?.data?.detail || "预付落账失败");
+    }
+  };
+
+  // 批次③：开票 → 弹窗预填当前账单总额
+  const openInvoiceForBill = async () => {
+    if (!openId || !detail) return;
+    // 消费额 = 当前账单所有 OPEN 条目金额合计（按现有约定；不含已红冲/Void）
+    const consume = detail.items
+      .filter((i) => i.amount > 0)
+      .reduce((s, i) => s + i.amount, 0);
+    invoiceForm.resetFields();
+    invoiceForm.setFieldsValue({
+      bill_id: detail.id,
+      booking_id: detail.booking_id ?? undefined,
+      room_no: detail.room_no ?? "",
+      guest_name: detail.guest_name ?? "",
+      check_out_at: dayjs(),
+      consume_amount_cents: consume,
+      invoice_amount_cents: consume,
+      invoice_type: "NORMAL",
+      title: "",
+      tax_no: "",
+      approver: "",
+      operator: currentOperator(),
+      memo: "",
+    });
+    setInvoiceOpen(true);
+    // 异步拉该账单已有发票
+    setExistingInvoicesLoading(true);
+    try {
+      const list = await listInvoicesByBill(tenantCode, detail.id);
+      setExistingInvoices(list);
+    } catch {
+      setExistingInvoices([]);
+    } finally {
+      setExistingInvoicesLoading(false);
+    }
+  };
+
+  const submitInvoice = async () => {
+    if (!detail) return;
+    const v = await invoiceForm.validateFields();
+    if (watchType === "VAT_SPECIAL" && !v.tax_no?.trim()) {
+      message.error("增值税专用发票必填税号");
+      return;
+    }
+    const consume = Number(v.consume_amount_cents || 0);
+    const invoice = Number(v.invoice_amount_cents || 0);
+    if (invoice - consume > INVOICE_APPROVER_THRESHOLD && !v.approver?.trim()) {
+      message.error(`开票额超过消费额 ${INVOICE_APPROVER_THRESHOLD / 100} 元，需填写审批人`);
+      return;
+    }
+    setInvoiceBusy(true);
+    try {
+      await createInvoice(tenantCode, {
+        invoice_no: v.invoice_no?.trim() || null,
+        bill_id: v.bill_id ?? null,
+        booking_id: v.booking_id ?? null,
+        room_no: v.room_no?.trim() || null,
+        guest_name: v.guest_name?.trim() || null,
+        agreement_no: v.agreement_no?.trim() || null,
+        check_in_at: v.check_in_at ? dayjs(v.check_in_at).format("YYYY-MM-DD HH:mm:ss") : null,
+        check_out_at: v.check_out_at
+          ? dayjs(v.check_out_at).format("YYYY-MM-DD HH:mm:ss")
+          : dayjs().format("YYYY-MM-DD HH:mm:ss"),
+        check_in_type: v.check_in_type?.trim() || null,
+        consume_amount_cents: consume,
+        invoice_amount_cents: invoice,
+        invoice_type: v.invoice_type || "NORMAL",
+        title: v.title?.trim() || null,
+        tax_no: v.tax_no?.trim() || null,
+        approver: v.approver?.trim() || null,
+        work_shift: v.work_shift?.trim() || null,
+        memo: v.memo?.trim() || null,
+        operator: currentOperator(),
+      });
+      message.success("开票成功");
+      // 刷新该账单的发票列表
+      try {
+        const list = await listInvoicesByBill(tenantCode, detail.id);
+        setExistingInvoices(list);
+      } catch {
+        /* 静默 */
+      }
+    } catch (e: any) {
+      message.error(e?.response?.data?.detail || (e as Error).message || "开票失败");
+    } finally {
+      setInvoiceBusy(false);
     }
   };
 
@@ -579,6 +701,78 @@ export default function Billing() {
               )}
             </Card>
 
+            {/* 批次③：当前账单已开发票 */}
+            <Card
+              size="small"
+              title={
+                <Space>
+                  发票记录
+                  <Button
+                    size="small"
+                    type="link"
+                    loading={existingInvoicesLoading}
+                    onClick={async () => {
+                      if (!detail) return;
+                      setExistingInvoicesLoading(true);
+                      try {
+                        const list = await listInvoicesByBill(tenantCode, detail.id);
+                        setExistingInvoices(list);
+                      } catch {
+                        /* noop */
+                      } finally {
+                        setExistingInvoicesLoading(false);
+                      }
+                    }}
+                  >
+                    刷新
+                  </Button>
+                </Space>
+              }
+            >
+              <Table
+                rowKey="id"
+                size="small"
+                pagination={false}
+                loading={existingInvoicesLoading}
+                dataSource={existingInvoices}
+                locale={{ emptyText: "该账单暂未开票" }}
+                columns={[
+                  { title: "发票号", dataIndex: "invoice_no", width: 150 },
+                  {
+                    title: "开票额",
+                    dataIndex: "invoice_amount_cents",
+                    width: 110,
+                    render: (v: number) => fmtCents(v),
+                  },
+                  {
+                    title: "消费额",
+                    dataIndex: "consume_amount_cents",
+                    width: 110,
+                    render: (v: number) => fmtCents(v),
+                  },
+                  {
+                    title: "类型",
+                    dataIndex: "invoice_type",
+                    width: 90,
+                    render: (v: string) => <Tag>{v || "—"}</Tag>,
+                  },
+                  {
+                    title: "状态",
+                    dataIndex: "status",
+                    width: 100,
+                    render: (v: string) =>
+                      v === "VOID" ? <Tag color="red">已作废</Tag> : <Tag color="green">已开</Tag>,
+                  },
+                  { title: "开票人", dataIndex: "operator", width: 110 },
+                  {
+                    title: "开票时间",
+                    dataIndex: "created_at",
+                    render: (v: string) => (v ? new Date(v).toLocaleString() : "—"),
+                  },
+                ]}
+              />
+            </Card>
+
             <Space>
               <Popconfirm
                 title="确认结账？"
@@ -601,6 +795,13 @@ export default function Billing() {
                 退款
               </Button>
               <Button onClick={handlePrepay}>预付落账</Button>
+              <Button
+                icon={<FileDoneOutlined />}
+                disabled={!canManageInvoice}
+                onClick={openInvoiceForBill}
+              >
+                开票
+              </Button>
             </Space>
             {detail.balance !== 0 && (
               <Text type="secondary">
@@ -676,6 +877,114 @@ export default function Billing() {
                 { value: "UNIONPAY", label: "银联" },
               ]}
             />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* 批次③：开票 Modal（前台收银 → 当前账单 → 开票） */}
+      <Modal
+        title={`开票 · 账单 ${detail?.bill_no ?? ""}`}
+        open={invoiceOpen}
+        onOk={submitInvoice}
+        onCancel={() => setInvoiceOpen(false)}
+        okText="确认开票"
+        cancelText="取消"
+        confirmLoading={invoiceBusy}
+        width={620}
+        destroyOnClose
+      >
+        <Form form={invoiceForm} layout="vertical" preserve={false}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 16px" }}>
+            <Form.Item name="bill_id" label="账单 ID">
+              <InputNumber style={{ width: "100%" }} disabled />
+            </Form.Item>
+            <Form.Item name="booking_id" label="预订 ID">
+              <InputNumber style={{ width: "100%" }} disabled />
+            </Form.Item>
+            <Form.Item name="room_no" label="房号">
+              <Input maxLength={16} />
+            </Form.Item>
+            <Form.Item name="guest_name" label="客人姓名">
+              <Input maxLength={128} />
+            </Form.Item>
+            <Form.Item
+              name="check_out_at"
+              label="退房时间"
+              rules={[{ required: true, message: "请选择退房时间" }]}
+            >
+              <DatePicker
+                showTime
+                format="YYYY-MM-DD HH:mm:ss"
+                style={{ width: "100%" }}
+              />
+            </Form.Item>
+            <Form.Item name="check_in_type" label="入住类型">
+              <Input maxLength={16} placeholder="如 全日租/钟点房" />
+            </Form.Item>
+          </div>
+          <Form.Item
+            name="consume_amount_cents"
+            label="消费额（分）"
+            rules={[{ required: true, message: "请输入消费额" }]}
+          >
+            <InputNumber min={0} step={1} style={{ width: "100%" }} addonBefore="分" />
+          </Form.Item>
+          <Form.Item
+            name="invoice_amount_cents"
+            label="开票额（分）"
+            rules={[{ required: true, message: "请输入开票额" }]}
+          >
+            <InputNumber min={0} step={1} style={{ width: "100%" }} addonBefore="分" />
+          </Form.Item>
+          {requireApprover && (
+            <Typography.Text type="warning" style={{ display: "block", marginBottom: 8 }}>
+              开票额超过消费额 {INVOICE_APPROVER_THRESHOLD / 100} 元，需填写审批人
+            </Typography.Text>
+          )}
+          <Form.Item
+            name="invoice_type"
+            label="发票类型"
+            rules={[{ required: true, message: "请选择发票类型" }]}
+          >
+            <Radio.Group options={INVOICE_TYPE_OPTIONS} />
+          </Form.Item>
+          <Form.Item name="title" label="抬头">
+            <Input maxLength={128} />
+          </Form.Item>
+          <Form.Item
+            name="tax_no"
+            label="税号"
+            rules={
+              watchType === "VAT_SPECIAL"
+                ? [{ required: true, message: "专票必填税号" }]
+                : []
+            }
+          >
+            <Input
+              maxLength={64}
+              placeholder={watchType === "VAT_SPECIAL" ? "必填" : "选填"}
+            />
+          </Form.Item>
+          <Form.Item
+            name="approver"
+            label="审批人"
+            rules={requireApprover ? [{ required: true, message: "开票额超额，必填审批人" }] : []}
+          >
+            <Input
+              maxLength={64}
+              placeholder={requireApprover ? "必填（审计追溯）" : "选填"}
+            />
+          </Form.Item>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 16px" }}>
+            <Form.Item name="work_shift" label="班次">
+              <Input maxLength={50} placeholder="如 早班/中班/晚班" />
+            </Form.Item>
+            <Form.Item name="invoice_no" label="发票号（可选，不填自动生成）">
+              <Input maxLength={32} />
+            </Form.Item>
+          </div>
+          <Form.Item name="memo" label="备注">
+            <Input.TextArea rows={2} maxLength={255} />
           </Form.Item>
         </Form>
       </Modal>

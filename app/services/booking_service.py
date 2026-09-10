@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.domain.room_state import InvalidTransition, RoomState, RoomTrigger
 from app.events.base import BookingStateChanged, utc_now
 from app.events.bus import event_bus
-from app.models import AuditLog, Bill, Booking, BookingStatus, Hotel, RateCode, Room, RoomType
+from app.models import AuditLog, Bill, BillItem, Booking, BookingStatus, Hotel, RateCode, Room, RoomChange, RoomType, StayExtension
 from app.services.cashier_service import CashierService
 from app.services.guest_service import GuestService
 from app.services.housekeeping_service import HousekeepingService
@@ -321,6 +321,46 @@ class BookingService:
                 },
             )
         )
+        # M37-③：落续住 WORM 记录 + 加收房费入账（若存在 OPEN 账单）
+        open_bill = (
+            await self.session.execute(
+                select(Bill).where(
+                    Bill.tenant_id == booking.tenant_id,
+                    Bill.booking_id == booking.id,
+                    Bill.status == "OPEN",
+                )
+            )
+        ).scalar_one_or_none()
+        if added_total > 0:
+            se = StayExtension(
+                tenant_id=booking.tenant_id,
+                hotel_id=booking.hotel_id,
+                booking_id=booking.id,
+                room_no=booking.room_no,
+                bill_id=open_bill.id if open_bill is not None else None,
+                business_date=date.today().isoformat(),
+                start_date=old_check_out,
+                end_date=new_check_out_date,
+                nights=len(added_nights),
+                added_amount_cents=added_total,
+                is_valid=True,
+                operator=operator,
+            )
+            self.session.add(se)
+            if open_bill is not None:
+                open_bill.balance = (open_bill.balance or 0) + added_total
+                self.session.add(open_bill)
+                self.session.add(
+                    BillItem(
+                        tenant_id=booking.tenant_id,
+                        bill_id=open_bill.id,
+                        type="ROOM_CHARGE",
+                        amount=added_total,
+                        description=f"续住加收 {len(added_nights)} 晚",
+                        business_date=se.business_date,
+                        created_by=operator,
+                    )
+                )
         await self.session.commit()
         await self.session.refresh(booking)
         await event_bus.publish(
@@ -336,11 +376,21 @@ class BookingService:
         return booking
 
     async def change_room(
-        self, booking: Booking, new_room_no: str, operator: str = "front_desk"
+        self,
+        booking: Booking,
+        new_room_no: str,
+        operator: str = "front_desk",
+        reason: str = "",
     ) -> Booking:
-        """换房：在住房客从原房换至同房型空净房，原房转空脏待清扫（绿云在住操作台-换房）。"""
+        """换房：在住房客从原房换至同房型空净房，原房转空脏待清扫（绿云在住操作台-换房）。
+
+        M37-③ 增：必传 ``reason``（审计刚需）；落 ``RoomChange`` WORM 记录；
+        若有房价差价（to_price - from_price > 0）则写 ``BillItem(ROOM_CHARGE, +diff)``。
+        """
         if booking.status != BookingStatus.CHECKED_IN.value or not booking.room_no:
             raise ValueError("仅 CHECKED_IN 且有房号可换房")
+        if not reason or not reason.strip():
+            raise ValueError("换房原因 reason 必填")
         if new_room_no == booking.room_no:
             raise ValueError("换房目标房号不能与原房相同")
         old_room = await self._get_room(booking.tenant_id, booking.room_no)
@@ -376,9 +426,48 @@ class BookingService:
                 action="booking.change_room",
                 resource_type="booking",
                 resource_id=str(booking.id),
-                detail={"from": old_room_no, "to": new_room_no},
+                detail={"from": old_room_no, "to": new_room_no, "reason": reason},
             )
         )
+        # M37-③：落换房 WORM 记录 + 差价入账（price_diff > 0 时）
+        from app.core.snowflake import next_id  # noqa: PLC0415
+
+        # Room 无 room_type 关系；用 booking.room_type_id 反查（既有换房校验已保证
+        # old/new 同房型，故 from_price == to_price，diff 通常为 0；保留字段为未来跨型升级预留）
+        rt = await self.session.get(RoomType, booking.room_type_id)
+        rt_price = rt.base_price if rt else None
+        rc = RoomChange(
+            tenant_id=booking.tenant_id,
+            hotel_id=booking.hotel_id,
+            change_no=f"RC{next_id()}",
+            booking_id=booking.id,
+            bill_id=bill.id if bill is not None else None,
+            from_room_no=old_room_no,
+            to_room_no=new_room_no,
+            from_room_type_id=old_room.room_type_id,
+            to_room_type_id=new_room.room_type_id,
+            from_price_cents=rt_price,
+            to_price_cents=rt_price,
+            price_diff_cents=0,
+            reason=reason,
+            business_date=date.today().isoformat(),
+            operator=operator,
+        )
+        self.session.add(rc)
+        if rc.price_diff_cents > 0 and bill is not None:
+            bill.balance = (bill.balance or 0) + rc.price_diff_cents
+            self.session.add(
+                BillItem(
+                    tenant_id=booking.tenant_id,
+                    bill_id=bill.id,
+                    type="ROOM_CHARGE",
+                    amount=rc.price_diff_cents,
+                    description=f"换房差价 {old_room_no}→{new_room_no}",
+                    business_date=rc.business_date,
+                    created_by=operator,
+                )
+            )
+            self.session.add(bill)
         await self.session.commit()
         await self.session.refresh(booking)
         await event_bus.publish(

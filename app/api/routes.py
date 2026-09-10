@@ -95,6 +95,11 @@ from app.api.schemas import (
     BookingExtendIn,
     BookingExtrasIn,
     BookingOut,
+    InvoiceIn,
+    InvoiceOut,
+    InvoiceVoidIn,
+    RoomChangeOut,
+    StayExtensionOut,
     ReceptionCheckInIn,
     ReceptionContext,
     ReceptionAdvanceIn,
@@ -243,6 +248,7 @@ from app.models import (
     GroupBlock,
     Hotel,
     HousekeepingTask,
+    Invoice,
     Member,
     Notification,
     NotificationPreference,
@@ -263,8 +269,10 @@ from app.models import (
     RateCode,
     Role,
     Room,
+    RoomChange,
     RoomType,
     ShiftHandover,
+    StayExtension,
     Tenant,
     User,
     UserRole,
@@ -283,6 +291,7 @@ from app.services.cashier_service import CashierService
 from app.services.commission_service import CommissionService
 from app.services.deposit_service import DepositError, DepositService
 from app.services.group_service import GroupService
+from app.services.invoice_service import InvoiceError, InvoiceService
 from app.services.guest_service import GuestService
 from app.services.housekeeping_service import HousekeepingService
 from app.services.manager_service import ManagerService
@@ -312,6 +321,7 @@ from app.services.permissions import (
     DEPOSIT_REFUND,
     OTA_MANAGE,
     RATE_EDIT,
+    INVOICE_MANAGE,
 )
 from app.services.pay_service import PayService
 from app.services.price_service import PriceService
@@ -1221,7 +1231,9 @@ async def booking_change_room(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "预订不存在")
     svc = BookingService(session)
     try:
-        return await svc.change_room(booking, body.new_room_no, operator=body.operator)
+        return await svc.change_room(
+            booking, body.new_room_no, operator=body.operator, reason=body.reason
+        )
     except ValueError as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
     except InvalidTransition as exc:
@@ -5661,3 +5673,261 @@ async def search_global(
             by_type["notification"] = 0
 
     return SearchResultOut(items=items, total=len(items), by_type=by_type, query=q_strip)
+
+
+# ---------- M37-③ 发票 + 换房记录 + 续住记录 ----------
+
+
+@router.post(
+    "/tenants/{tenant_id}/invoices",
+    response_model=InvoiceOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Security(require_perm, scopes=[INVOICE_MANAGE])],
+)
+async def create_invoice(
+    tenant_id: str,
+    body: InvoiceIn,
+    session: AsyncSession = Depends(get_session),
+) -> InvoiceOut:
+    """开票（201）。规则：开票额>消费额且差额>¥10 必填审批人；专票必填税号。"""
+    hotel_id = await _resolve_hotel_id_from_invoice(session, tenant_id, body)
+    svc = InvoiceService(session)
+    try:
+        inv = await svc.create(
+            tenant_id=tenant_id,
+            hotel_id=hotel_id,
+            invoice_no=body.invoice_no,
+            bill_id=body.bill_id,
+            booking_id=body.booking_id,
+            room_no=body.room_no,
+            guest_name=body.guest_name,
+            agreement_no=body.agreement_no,
+            check_in_at=body.check_in_at,
+            check_out_at=body.check_out_at,
+            check_in_type=body.check_in_type,
+            consume_amount_cents=body.consume_amount_cents,
+            invoice_amount_cents=body.invoice_amount_cents,
+            invoice_type=body.invoice_type,
+            title=body.title,
+            tax_no=body.tax_no,
+            approver=body.approver,
+            work_shift=body.work_shift,
+            flag=body.flag,
+            memo=body.memo,
+            operator=body.operator,
+        )
+    except InvoiceError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+    await session.commit()
+    await session.refresh(inv)
+    return InvoiceOut.model_validate(inv)
+
+
+@router.get(
+    "/tenants/{tenant_id}/invoices",
+    response_model=list[InvoiceOut],
+    dependencies=[Security(require_perm, scopes=[INVOICE_MANAGE])],
+)
+async def list_invoices(
+    tenant_id: str,
+    bill_id: int | None = None,
+    booking_id: int | None = None,
+    status: str | None = None,
+    limit: int | None = None,
+    offset: int = 0,
+    session: AsyncSession = Depends(get_session),
+) -> list[InvoiceOut]:
+    """发票列表（带 MAX_LIST_ROWS 护栏）。"""
+    svc = InvoiceService(session)
+    rows = await svc.list(
+        tenant_id=tenant_id,
+        bill_id=bill_id,
+        booking_id=booking_id,
+        status=status,
+        limit=limit,
+        offset=offset,
+    )
+    return [InvoiceOut.model_validate(r) for r in rows]
+
+
+@router.get(
+    "/tenants/{tenant_id}/invoices/{invoice_id}",
+    response_model=InvoiceOut,
+    dependencies=[Security(require_perm, scopes=[INVOICE_MANAGE])],
+)
+async def get_invoice(
+    tenant_id: str,
+    invoice_id: int,
+    session: AsyncSession = Depends(get_session),
+) -> InvoiceOut:
+    """发票详情。"""
+    inv = await session.get(Invoice, invoice_id)
+    if inv is None or inv.tenant_id != tenant_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "发票不存在")
+    return InvoiceOut.model_validate(inv)
+
+
+@router.post(
+    "/tenants/{tenant_id}/invoices/{invoice_id}/void",
+    response_model=InvoiceOut,
+    dependencies=[Security(require_perm, scopes=[INVOICE_MANAGE, BILL_ADJUST])],
+)
+async def void_invoice(
+    tenant_id: str,
+    invoice_id: int,
+    body: InvoiceVoidIn,
+    session: AsyncSession = Depends(get_session),
+) -> InvoiceOut:
+    """作废发票（WORM，仅置 status=VOID，不改金额）。需要 invoice.manage + billing.adjust。"""
+    svc = InvoiceService(session)
+    try:
+        inv = await svc.void(tenant_id, invoice_id, operator=body.operator)
+    except InvoiceError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+    await session.commit()
+    await session.refresh(inv)
+    return InvoiceOut.model_validate(inv)
+
+
+@router.get(
+    "/tenants/{tenant_id}/bills/{bill_id}/invoices",
+    response_model=list[InvoiceOut],
+    dependencies=[Security(require_perm, scopes=[INVOICE_MANAGE])],
+)
+async def list_invoices_by_bill(
+    tenant_id: str,
+    bill_id: int,
+    session: AsyncSession = Depends(get_session),
+) -> list[InvoiceOut]:
+    """按账单查发票。"""
+    bill = await session.get(Bill, bill_id)
+    if bill is None or bill.tenant_id != tenant_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "账单不存在")
+    svc = InvoiceService(session)
+    rows = await svc.list_by_bill(tenant_id, bill_id)
+    return [InvoiceOut.model_validate(r) for r in rows]
+
+
+@router.get(
+    "/tenants/{tenant_id}/room-changes",
+    response_model=list[RoomChangeOut],
+)
+async def list_room_changes(
+    tenant_id: str,
+    booking_id: int | None = None,
+    room_no: str | None = None,
+    business_date: str | None = None,
+    limit: int | None = None,
+    offset: int = 0,
+    session: AsyncSession = Depends(get_session),
+) -> list[RoomChangeOut]:
+    """换房记录列表（登录态，筛选 booking_id/room_no/business_date，带 MAX_LIST_ROWS）。"""
+    stmt = select(RoomChange).where(RoomChange.tenant_id == tenant_id)
+    if booking_id is not None:
+        stmt = stmt.where(RoomChange.booking_id == booking_id)
+    if room_no:
+        stmt = stmt.where(RoomChange.from_room_no == room_no)
+    if business_date:
+        stmt = stmt.where(RoomChange.business_date == business_date)
+    stmt = stmt.order_by(RoomChange.id.desc())
+    stmt = stmt.offset(max(0, offset)).limit(
+        MAX_LIST_ROWS if limit is None else max(1, min(limit, MAX_LIST_ROWS))
+    )
+    result = await session.execute(stmt)
+    return [RoomChangeOut.model_validate(r) for r in result.scalars()]
+
+
+@router.get(
+    "/tenants/{tenant_id}/bookings/{booking_id}/room-changes",
+    response_model=list[RoomChangeOut],
+)
+async def list_room_changes_by_booking(
+    tenant_id: str,
+    booking_id: int,
+    session: AsyncSession = Depends(get_session),
+) -> list[RoomChangeOut]:
+    """某单换房历史。"""
+    stmt = (
+        select(RoomChange)
+        .where(
+            RoomChange.tenant_id == tenant_id,
+            RoomChange.booking_id == booking_id,
+        )
+        .order_by(RoomChange.id.desc())
+    )
+    result = await session.execute(stmt)
+    return [RoomChangeOut.model_validate(r) for r in result.scalars()]
+
+
+@router.get(
+    "/tenants/{tenant_id}/stay-extensions",
+    response_model=list[StayExtensionOut],
+)
+async def list_stay_extensions(
+    tenant_id: str,
+    booking_id: int | None = None,
+    business_date: str | None = None,
+    limit: int | None = None,
+    offset: int = 0,
+    session: AsyncSession = Depends(get_session),
+) -> list[StayExtensionOut]:
+    """续住记录列表（登录态，带 MAX_LIST_ROWS）。"""
+    stmt = select(StayExtension).where(StayExtension.tenant_id == tenant_id)
+    if booking_id is not None:
+        stmt = stmt.where(StayExtension.booking_id == booking_id)
+    if business_date:
+        stmt = stmt.where(StayExtension.business_date == business_date)
+    stmt = stmt.order_by(StayExtension.id.desc())
+    stmt = stmt.offset(max(0, offset)).limit(
+        MAX_LIST_ROWS if limit is None else max(1, min(limit, MAX_LIST_ROWS))
+    )
+    result = await session.execute(stmt)
+    return [StayExtensionOut.model_validate(r) for r in result.scalars()]
+
+
+@router.get(
+    "/tenants/{tenant_id}/bookings/{booking_id}/stay-extensions",
+    response_model=list[StayExtensionOut],
+)
+async def list_stay_extensions_by_booking(
+    tenant_id: str,
+    booking_id: int,
+    session: AsyncSession = Depends(get_session),
+) -> list[StayExtensionOut]:
+    """某单续住历史。"""
+    stmt = (
+        select(StayExtension)
+        .where(
+            StayExtension.tenant_id == tenant_id,
+            StayExtension.booking_id == booking_id,
+        )
+        .order_by(StayExtension.id.desc())
+    )
+    result = await session.execute(stmt)
+    return [StayExtensionOut.model_validate(r) for r in result.scalars()]
+
+
+async def _resolve_hotel_id_from_invoice(
+    session: AsyncSession, tenant_id: str, body: InvoiceIn
+) -> int:
+    """从账单/订单/客房反查 hotel_id（开票需酒店归属）。"""
+    if body.bill_id is not None:
+        bill = await session.get(Bill, body.bill_id)
+        if bill is not None and bill.tenant_id == tenant_id and bill.hotel_id:
+            return bill.hotel_id
+    if body.booking_id is not None:
+        bk = await session.get(Booking, body.booking_id)
+        if bk is not None and bk.tenant_id == tenant_id and bk.hotel_id:
+            return bk.hotel_id
+    # fallback：租户下任意酒店（多门店场景下应显式传 bill/booking）
+    from sqlalchemy import select as _sel
+
+    h = (
+        await session.execute(
+            _sel(Hotel).where(Hotel.tenant_id == tenant_id).limit(1)
+        )
+    ).scalar_one_or_none()
+    if h is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "无法确定发票归属门店")
+    return h.id
+

@@ -113,6 +113,7 @@ const baseItems: MenuProps["items"] = [
       { key: "/reconciliation", icon: <ReconciliationOutlined />, label: "支付对账" },
       { key: "/adjustments", icon: <SwapOutlined />, label: "调账中心" },
       { key: "/deposits", icon: <CreditCardOutlined />, label: "押金管理" },
+      { key: "/invoices", icon: <FileDoneOutlined />, label: "发票管理" },
     ],
   },
   {
@@ -272,7 +273,8 @@ function parentKey(path: string): string | undefined {
   if (hit(path, "/members") || hit(path, "/ar-accounts")) return "crm";
   if (
     hit(path, "/commission") || hit(path, "/reconciliation") ||
-    hit(path, "/adjustments") || hit(path, "/deposits")
+    hit(path, "/adjustments") || hit(path, "/deposits") ||
+    hit(path, "/invoices")
   ) return "finance";
   if (hit(path, "/rates") || hit(path, "/rate-calendar") || hit(path, "/yield")) return "yield";
   if (hit(path, "/group") || hit(path, "/price-policy")) return "group";

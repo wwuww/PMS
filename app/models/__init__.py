@@ -20,7 +20,8 @@ from app.models.ota import (
 from app.models.base import Base
 from app.models.rbac import LoginSession, RefreshToken, Role, User, UserRole
 from app.models.billing import ArAccount, ArRepayment, Bill, BillItem, Payment
-from app.models.booking import Booking, BookingStatus
+from app.models.booking import Booking, BookingStatus, StayExtension
+from app.models.invoice import Invoice
 from app.models.commission import CommissionReconciliation, CommissionRule
 from app.models.deposit import (
     Deposit,
@@ -54,7 +55,7 @@ from app.models.shift import ShiftHandover
 from app.models.wakeup import WakeUpCall
 from app.models.rate import RateCode
 from app.models.yield_mgmt import PriceRecommendation, PricingRule
-from app.models.room import Room, RoomStateEvent, RoomType
+from app.models.room import Room, RoomChange, RoomStateEvent, RoomType
 from app.models.shift import ShiftHandover
 from app.models.tenant import Hotel, Tenant
 
@@ -123,11 +124,14 @@ __all__ = [
     "ReportTemplate",
     "Role",
     "Room",
+    "RoomChange",
     "RoomStateEvent",
     "RoomType",
     "ShiftHandover",
+    "StayExtension",
     "Tenant",
     "User",
     "UserRole",
     "WakeUpCall",
+    "Invoice",
 ]
