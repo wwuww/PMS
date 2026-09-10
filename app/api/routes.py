@@ -32,6 +32,20 @@ async def _lookup_tenant(tenant_id: str, session: AsyncSession) -> Tenant | None
     return result.scalar_one_or_none()
 
 from app.api.schemas import (
+    # M37-④ 早餐券 + 优惠券 + 房间属性 + 黑名单
+    RoomAttributeIn,
+    RoomAttributeOut,
+    BlackGuestIn,
+    BlackGuestOut,
+    BlacklistHit,
+    BreakfastIssueIn,
+    BreakfastUseIn,
+    BreakfastTicketOut,
+    CouponTemplateIn,
+    CouponTemplateOut,
+    CouponIn,
+    CouponUseIn,
+    CouponOut,
     AdjustmentIn,
     ArAccountCreate,
     ArAccountOut,
@@ -322,6 +336,9 @@ from app.services.permissions import (
     OTA_MANAGE,
     RATE_EDIT,
     INVOICE_MANAGE,
+    BLACKLIST_MANAGE,
+    COUPON_MANAGE,
+    BREAKFAST_MANAGE,
 )
 from app.services.pay_service import PayService
 from app.services.price_service import PriceService
@@ -5930,4 +5947,526 @@ async def _resolve_hotel_id_from_invoice(
     if h is None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "无法确定发票归属门店")
     return h.id
+
+
+# ---- M37-④ 依赖集中声明（置于本分区之前，避免多人协作下顶部 import 块互相覆盖） ----
+from app.models import (  # noqa: E402, F811
+    BlackGuest,
+    BreakfastTicket,
+    Coupon,
+    CouponTemplate,
+    RoomAttribute,
+)
+from app.api.schemas import (  # noqa: E402, F811
+    BlackGuestIn,
+    BlackGuestOut,
+    BlacklistHit,
+    BreakfastIssueIn,
+    BreakfastTicketOut,
+    BreakfastUseIn,
+    CouponIn,
+    CouponOut,
+    CouponTemplateIn,
+    CouponTemplateOut,
+    CouponUseIn,
+    RoomAttributeIn,
+    RoomAttributeOut,
+)
+from app.services.breakfast_service import BreakfastService  # noqa: E402
+from app.services.coupon_service import CouponService  # noqa: E402
+
+
+# ============================ M37-④ 早餐券 + 优惠券 + 房间属性 + 黑名单 ============================
+#
+# 设计要点：
+# - 服务层只抛 ``ValueError``，路由统一映射：参数类 400 / 不存在 404 / 状态冲突 409；
+# - 黑名单遵循 D1「仅提醒不硬阻断」——本分区只提供查询/维护，不拦截任何业务写路径；
+# - 券/早餐券的 ``hotel_id`` 非空，未显式传入时按 订单 → 房间 → 租户首店 反查。
+
+# 参数校验类错误提示词（用于区分 400 与 409）
+_VALIDATION_HINTS = (
+    "必填",
+    "须为",
+    "须 >",
+    "不可超过",
+    "不可为负",
+    "未知折扣类型",
+    "无法确定",
+)
+
+
+def _map_value_error(exc: ValueError) -> HTTPException:
+    """服务层 ``ValueError`` → HTTP：参数类 400 / 不存在 404 / 其余状态冲突 409。"""
+    msg = str(exc)
+    if any(hint in msg for hint in _VALIDATION_HINTS):
+        return HTTPException(status.HTTP_400_BAD_REQUEST, msg)
+    if "不存在" in msg:
+        return HTTPException(status.HTTP_404_NOT_FOUND, msg)
+    return HTTPException(status.HTTP_409_CONFLICT, msg)
+
+
+async def _resolve_hotel_id_mini(
+    session: AsyncSession,
+    tenant_id: str,
+    booking_id: int | None = None,
+    room_id: int | None = None,
+) -> int:
+    """反查归属门店（早餐券/优惠券 hotel_id 非空）：订单 → 房间 → 租户首个门店。"""
+    if booking_id is not None:
+        bk = await session.get(Booking, booking_id)
+        if bk is not None and bk.tenant_id == tenant_id and bk.hotel_id:
+            return bk.hotel_id
+    if room_id is not None:
+        room = await session.get(Room, room_id)
+        if room is not None and room.tenant_id == tenant_id and room.hotel_id:
+            return room.hotel_id
+    h = (
+        await session.execute(select(Hotel).where(Hotel.tenant_id == tenant_id).limit(1))
+    ).scalar_one_or_none()
+    if h is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "无法确定归属门店")
+    return h.id
+
+
+# ---------- 房间属性 ----------
+
+
+@router.get(
+    "/tenants/{tenant_id}/rooms/{room_id}/attributes",
+    response_model=list[RoomAttributeOut],
+)
+async def list_room_attributes(
+    tenant_id: str,
+    room_id: int,
+    session: AsyncSession = Depends(get_session),
+) -> list[RoomAttributeOut]:
+    """房间属性列表（登录态即可读，排房页与房态盘共用）。"""
+    rows = await RoomService(session).list_room_attributes(tenant_id, room_id)
+    return [RoomAttributeOut.model_validate(r) for r in rows]
+
+
+@router.put(
+    "/tenants/{tenant_id}/rooms/{room_id}/attributes",
+    response_model=list[RoomAttributeOut],
+)
+async def replace_room_attributes(
+    tenant_id: str,
+    room_id: int,
+    body: RoomAttributeIn,
+    session: AsyncSession = Depends(get_session),
+) -> list[RoomAttributeOut]:
+    """房间属性全量覆盖（幂等：先软删再重建，一次 PUT 即最终态）。"""
+    svc = RoomService(session)
+    try:
+        rows = await svc.set_room_attributes(
+            tenant_id=tenant_id,
+            hotel_id=0,  # 0 → 服务层回退到房间所属门店
+            room_id=room_id,
+            codes=body.codes,
+            memo=body.memo,
+            operator=body.operator,
+        )
+    except ValueError as exc:
+        raise _map_value_error(exc) from exc
+    await session.commit()
+    for row in rows:
+        await session.refresh(row)
+    return [RoomAttributeOut.model_validate(r) for r in rows]
+
+
+@router.get("/tenants/{tenant_id}/room-attributes", response_model=list[str])
+async def query_rooms_by_attributes(
+    tenant_id: str,
+    code: list[str] = Query(default_factory=list, description="属性编码，可重复传（AND 语义）"),
+    session: AsyncSession = Depends(get_session),
+) -> list[str]:
+    """按属性过滤房号（排房用）：返回同时具备全部 ``code`` 的房号。"""
+    return await RoomService(session).list_rooms_by_attributes(tenant_id, list(code))
+
+
+# ---------- 黑名单 ----------
+
+
+@router.get(
+    "/tenants/{tenant_id}/blacklist",
+    response_model=list[BlackGuestOut],
+    dependencies=[Security(require_perm, scopes=[BLACKLIST_MANAGE])],
+)
+async def list_blacklist(
+    tenant_id: str,
+    name: str | None = None,
+    id_no: str | None = None,
+    level: int | None = None,
+    is_valid: bool | None = None,
+    limit: int | None = None,
+    offset: int = 0,
+    session: AsyncSession = Depends(get_session),
+) -> list[BlackGuestOut]:
+    """黑名单列表（敏感数据，需 blacklist.manage）。"""
+    rows = await GuestService(session).list_blacklist(
+        tenant_id,
+        name=name,
+        id_no=id_no,
+        level=level,
+        is_valid=is_valid,
+        limit=limit,
+        offset=offset,
+    )
+    return [BlackGuestOut.model_validate(r) for r in rows]
+
+
+@router.post(
+    "/tenants/{tenant_id}/blacklist",
+    response_model=BlackGuestOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Security(require_perm, scopes=[BLACKLIST_MANAGE])],
+)
+async def add_blacklist(
+    tenant_id: str,
+    body: BlackGuestIn,
+    session: AsyncSession = Depends(get_session),
+) -> BlackGuestOut:
+    """加入黑名单（hotel_id 为空 = 全集团生效）。"""
+    svc = GuestService(session)
+    try:
+        row = await svc.add_blacklist(
+            tenant_id=tenant_id,
+            name=body.name,
+            reason=body.reason,
+            hotel_id=body.hotel_id,
+            id_no=body.id_no,
+            phone=body.phone,
+            level=body.level,
+            operator=body.operator,
+        )
+    except ValueError as exc:
+        raise _map_value_error(exc) from exc
+    await session.commit()
+    await session.refresh(row)
+    return BlackGuestOut.model_validate(row)
+
+
+@router.get("/tenants/{tenant_id}/blacklist/check", response_model=dict)
+async def check_blacklist(
+    tenant_id: str,
+    name: str | None = None,
+    id_no: str | None = None,
+    phone: str | None = None,
+    hotel_id: int | None = None,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """黑名单命中检查（**仅提醒不硬阻断**，返回 ``{hits: [...]}``）。
+
+    匹配优先级 id_no > phone > name；id_no/phone 命中为强命中（``strong=True``）。
+    """
+    hits = await GuestService(session).check_blacklist(
+        tenant_id, name=name, id_no=id_no, phone=phone, hotel_id=hotel_id
+    )
+    return {"hits": [BlacklistHit(**h).model_dump() for h in hits]}
+
+
+@router.delete(
+    "/tenants/{tenant_id}/blacklist/{black_id}",
+    response_model=BlackGuestOut,
+    dependencies=[Security(require_perm, scopes=[BLACKLIST_MANAGE])],
+)
+async def remove_blacklist(
+    tenant_id: str,
+    black_id: int,
+    operator: str = "front_desk",
+    session: AsyncSession = Depends(get_session),
+) -> BlackGuestOut:
+    """移出黑名单（WORM 软删，仅置 is_valid=False）。"""
+    svc = GuestService(session)
+    try:
+        row = await svc.remove_blacklist(tenant_id, black_id, operator=operator)
+    except ValueError as exc:
+        raise _map_value_error(exc) from exc
+    await session.commit()
+    await session.refresh(row)
+    return BlackGuestOut.model_validate(row)
+
+
+# ---------- 早餐券 ----------
+
+
+@router.post(
+    "/tenants/{tenant_id}/breakfast-tickets/issue",
+    response_model=list[BreakfastTicketOut],
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Security(require_perm, scopes=[BREAKFAST_MANAGE])],
+)
+async def issue_breakfast_tickets(
+    tenant_id: str,
+    body: BreakfastIssueIn,
+    session: AsyncSession = Depends(get_session),
+) -> list[BreakfastTicketOut]:
+    """发早餐券（一次 count 张，券号 BF{snowflake}）。"""
+    hotel_id = await _resolve_hotel_id_mini(session, tenant_id, booking_id=body.booking_id)
+    svc = BreakfastService(session)
+    try:
+        rows = await svc.issue(
+            tenant_id=tenant_id,
+            hotel_id=hotel_id,
+            booking_id=body.booking_id,
+            room_no=body.room_no,
+            ticket_type=body.ticket_type,
+            ticket_type_name=body.ticket_type_name,
+            count=body.count,
+            valid_from=body.valid_from,
+            valid_to=body.valid_to,
+            card_type=body.card_type,
+            memo=body.memo,
+            operator=body.operator,
+        )
+    except ValueError as exc:
+        raise _map_value_error(exc) from exc
+    await session.commit()
+    for row in rows:
+        await session.refresh(row)
+    return [BreakfastTicketOut.model_validate(r) for r in rows]
+
+
+@router.post(
+    "/tenants/{tenant_id}/breakfast-tickets/use",
+    response_model=BreakfastTicketOut,
+    dependencies=[Security(require_perm, scopes=[BREAKFAST_MANAGE])],
+)
+async def use_breakfast_ticket(
+    tenant_id: str,
+    body: BreakfastUseIn,
+    session: AsyncSession = Depends(get_session),
+) -> BreakfastTicketOut:
+    """核销早餐券（已核销再核 → 409）。"""
+    svc = BreakfastService(session)
+    try:
+        row = await svc.use(
+            tenant_id=tenant_id,
+            ticket_no=body.ticket_no,
+            business_date=body.business_date,
+            operator=body.operator,
+        )
+    except ValueError as exc:
+        raise _map_value_error(exc) from exc
+    await session.commit()
+    await session.refresh(row)
+    return BreakfastTicketOut.model_validate(row)
+
+
+@router.post(
+    "/tenants/{tenant_id}/breakfast-tickets/{ticket_id}/void",
+    response_model=BreakfastTicketOut,
+    dependencies=[Security(require_perm, scopes=[BREAKFAST_MANAGE])],
+)
+async def void_breakfast_ticket(
+    tenant_id: str,
+    ticket_id: int,
+    operator: str = "front_desk",
+    session: AsyncSession = Depends(get_session),
+) -> BreakfastTicketOut:
+    """作废早餐券（已核销不可作废 → 409）。"""
+    svc = BreakfastService(session)
+    try:
+        row = await svc.void(tenant_id, ticket_id, operator=operator)
+    except ValueError as exc:
+        raise _map_value_error(exc) from exc
+    await session.commit()
+    await session.refresh(row)
+    return BreakfastTicketOut.model_validate(row)
+
+
+@router.get(
+    "/tenants/{tenant_id}/breakfast-tickets",
+    response_model=list[BreakfastTicketOut],
+    dependencies=[Security(require_perm, scopes=[BREAKFAST_MANAGE])],
+)
+async def list_breakfast_tickets(
+    tenant_id: str,
+    booking_id: int | None = None,
+    ticket_type: int | None = None,
+    is_used: bool | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    limit: int | None = None,
+    offset: int = 0,
+    session: AsyncSession = Depends(get_session),
+) -> list[BreakfastTicketOut]:
+    """早餐券列表（带 MAX_LIST_ROWS 护栏）。"""
+    rows = await BreakfastService(session).list(
+        tenant_id,
+        booking_id=booking_id,
+        ticket_type=ticket_type,
+        is_used=is_used,
+        date_from=date_from,
+        date_to=date_to,
+        limit=limit,
+        offset=offset,
+    )
+    return [BreakfastTicketOut.model_validate(r) for r in rows]
+
+
+# ---------- 优惠券 ----------
+
+
+@router.get(
+    "/tenants/{tenant_id}/coupon-templates",
+    response_model=list[CouponTemplateOut],
+    dependencies=[Security(require_perm, scopes=[COUPON_MANAGE])],
+)
+async def list_coupon_templates(
+    tenant_id: str,
+    is_valid: bool | None = None,
+    session: AsyncSession = Depends(get_session),
+) -> list[CouponTemplateOut]:
+    """券模板列表。"""
+    rows = await CouponService(session).list_templates(tenant_id, is_valid=is_valid)
+    return [CouponTemplateOut.model_validate(r) for r in rows]
+
+
+@router.post(
+    "/tenants/{tenant_id}/coupon-templates",
+    response_model=CouponTemplateOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Security(require_perm, scopes=[COUPON_MANAGE])],
+)
+async def create_coupon_template(
+    tenant_id: str,
+    body: CouponTemplateIn,
+    session: AsyncSession = Depends(get_session),
+) -> CouponTemplateOut:
+    """创建券模板（同租户内 code 唯一）。"""
+    svc = CouponService(session)
+    try:
+        row = await svc.create_template(
+            tenant_id=tenant_id,
+            code=body.code,
+            name=body.name,
+            valid_from=body.valid_from,
+            valid_to=body.valid_to,
+            hotel_id=body.hotel_id,
+            ticket_type=body.ticket_type,
+            discount_type=body.discount_type,
+            discount_value=body.discount_value,
+            total_quantity=body.total_quantity,
+            operator=body.operator,
+        )
+    except ValueError as exc:
+        raise _map_value_error(exc) from exc
+    await session.commit()
+    await session.refresh(row)
+    return CouponTemplateOut.model_validate(row)
+
+
+@router.post(
+    "/tenants/{tenant_id}/coupons",
+    response_model=list[CouponOut],
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Security(require_perm, scopes=[COUPON_MANAGE])],
+)
+async def issue_coupons(
+    tenant_id: str,
+    body: CouponIn,
+    session: AsyncSession = Depends(get_session),
+) -> list[CouponOut]:
+    """发券：按模板批量（扣减发行量）或散券直给规则。"""
+    hotel_id = body.hotel_id or await _resolve_hotel_id_mini(session, tenant_id)
+    svc = CouponService(session)
+    try:
+        rows = await svc.issue(
+            tenant_id=tenant_id,
+            hotel_id=hotel_id,
+            template_id=body.template_id,
+            count=body.count,
+            ticket_type=body.ticket_type,
+            discount_type=body.discount_type,
+            discount_value=body.discount_value,
+            valid_from=body.valid_from,
+            valid_to=body.valid_to,
+            is_cover_other_discount=body.is_cover_other_discount,
+            is_transfer_to_account=body.is_transfer_to_account,
+            operator=body.operator,
+        )
+    except ValueError as exc:
+        raise _map_value_error(exc) from exc
+    await session.commit()
+    for row in rows:
+        await session.refresh(row)
+    return [CouponOut.model_validate(r) for r in rows]
+
+
+@router.post(
+    "/tenants/{tenant_id}/coupons/use",
+    response_model=CouponOut,
+    dependencies=[Security(require_perm, scopes=[COUPON_MANAGE])],
+)
+async def use_coupon(
+    tenant_id: str,
+    body: CouponUseIn,
+    session: AsyncSession = Depends(get_session),
+) -> CouponOut:
+    """核销优惠券（转应收时写 BillItem(DISCOUNT) 并冲减账单余额）。"""
+    svc = CouponService(session)
+    try:
+        row = await svc.use(
+            tenant_id=tenant_id,
+            coupon_no=body.coupon_no,
+            booking_id=body.booking_id,
+            bill_id=body.bill_id,
+            operator=body.operator,
+        )
+    except ValueError as exc:
+        # 过期判定是一次有效状态迁移（ISSUED → EXPIRED），即使拒绝核销也要落库
+        await session.commit()
+        raise _map_value_error(exc) from exc
+    await session.commit()
+    await session.refresh(row)
+    return CouponOut.model_validate(row)
+
+
+@router.post(
+    "/tenants/{tenant_id}/coupons/{coupon_id}/void",
+    response_model=CouponOut,
+    dependencies=[Security(require_perm, scopes=[COUPON_MANAGE])],
+)
+async def void_coupon(
+    tenant_id: str,
+    coupon_id: int,
+    operator: str = "front_desk",
+    session: AsyncSession = Depends(get_session),
+) -> CouponOut:
+    """作废优惠券（已核销不可作废 → 409）。"""
+    svc = CouponService(session)
+    try:
+        row = await svc.void(tenant_id, coupon_id, operator=operator)
+    except ValueError as exc:
+        raise _map_value_error(exc) from exc
+    await session.commit()
+    await session.refresh(row)
+    return CouponOut.model_validate(row)
+
+
+@router.get(
+    "/tenants/{tenant_id}/coupons",
+    response_model=list[CouponOut],
+    dependencies=[Security(require_perm, scopes=[COUPON_MANAGE])],
+)
+async def list_coupons(
+    tenant_id: str,
+    status: str | None = None,
+    booking_id: int | None = None,
+    coupon_no: str | None = None,
+    limit: int | None = None,
+    offset: int = 0,
+    session: AsyncSession = Depends(get_session),
+) -> list[CouponOut]:
+    """优惠券列表（带 MAX_LIST_ROWS 护栏）。"""
+    rows = await CouponService(session).list(
+        tenant_id,
+        status=status,
+        booking_id=booking_id,
+        coupon_no=coupon_no,
+        limit=limit,
+        offset=offset,
+    )
+    return [CouponOut.model_validate(r) for r in rows]
 

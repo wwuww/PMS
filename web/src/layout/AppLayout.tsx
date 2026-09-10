@@ -10,6 +10,7 @@ import {
   CreditCardOutlined,
   FileDoneOutlined,
   AuditOutlined,
+  GiftOutlined,
   ToolOutlined,
   BellOutlined,
   AlertOutlined,
@@ -269,7 +270,7 @@ function parentKey(path: string): string | undefined {
     hit(path, "/housekeeping") || hit(path, "/nightaudit") ||
     hit(path, "/group-blocks") || hit(path, "/wakeup") || hit(path, "/psb")
   ) return "housekeeping-ops";
-  if (hit(path, "/pos") || hit(path, "/kds")) return "fnb";
+  if (hit(path, "/pos") || hit(path, "/kds") || hit(path, "/breakfast")) return "fnb";
   if (hit(path, "/members") || hit(path, "/ar-accounts")) return "crm";
   if (
     hit(path, "/commission") || hit(path, "/reconciliation") ||

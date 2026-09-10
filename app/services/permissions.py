@@ -27,6 +27,10 @@ OTA_MANAGE = "ota.manage"             # 渠道配置 / 房型映射 / 推送
 RATE_EDIT = "rate.edit"               # 渠道价 / 公共价编辑
 # M37-③ 发票
 INVOICE_MANAGE = "invoice.manage"     # 开票 / 作废 / 查 / 按账单查
+# M37-④ 早餐券 + 优惠券 + 房间属性 + 黑名单
+BLACKLIST_MANAGE = "blacklist.manage"  # 黑名单 增/删/查（敏感：仅管理员 + 门店经理）
+COUPON_MANAGE = "coupon.manage"        # 券模板 / 发券 / 核销 / 作废（前台可用）
+BREAKFAST_MANAGE = "breakfast.manage"  # 早餐券 发/核销/作废/查（前台可用）
 
 ALL_PERMISSIONS = {
     PRICE_EDIT,
@@ -44,6 +48,9 @@ ALL_PERMISSIONS = {
     OTA_MANAGE,
     RATE_EDIT,
     INVOICE_MANAGE,
+    BLACKLIST_MANAGE,
+    COUPON_MANAGE,
+    BREAKFAST_MANAGE,
 }
 
 
@@ -74,6 +81,9 @@ DEFAULT_ROLES: list[tuple[str, str, bool, list[str]]] = [
             OTA_MANAGE,
             RATE_EDIT,
             INVOICE_MANAGE,
+            BLACKLIST_MANAGE,
+            COUPON_MANAGE,
+            BREAKFAST_MANAGE,
         ],
     ),
     (
@@ -88,6 +98,9 @@ DEFAULT_ROLES: list[tuple[str, str, bool, list[str]]] = [
             DEPOSIT_MANAGE,
             DEPOSIT_REFUND,
             INVOICE_MANAGE,
+            # 黑名单属敏感数据：前台无 blacklist.manage；券与早餐券前台可用
+            COUPON_MANAGE,
+            BREAKFAST_MANAGE,
         ],
     ),
 ]

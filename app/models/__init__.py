@@ -34,7 +34,9 @@ from app.models.deposit import (
 )
 from app.models.group import GroupPricePolicy
 from app.models.member import Member
-from app.models.guest import Guest
+from app.models.breakfast import BreakfastTicket
+from app.models.coupon import Coupon, CouponTemplate
+from app.models.guest import BlackGuest, Guest
 from app.models.group_block import (
     ALLOC_ASSIGNED,
     ALLOC_CHECKED_IN,
@@ -55,7 +57,7 @@ from app.models.shift import ShiftHandover
 from app.models.wakeup import WakeUpCall
 from app.models.rate import RateCode
 from app.models.yield_mgmt import PriceRecommendation, PricingRule
-from app.models.room import Room, RoomChange, RoomStateEvent, RoomType
+from app.models.room import Room, RoomAttribute, RoomChange, RoomStateEvent, RoomType
 from app.models.shift import ShiftHandover
 from app.models.tenant import Hotel, Tenant
 
@@ -124,6 +126,7 @@ __all__ = [
     "ReportTemplate",
     "Role",
     "Room",
+    "RoomAttribute",
     "RoomChange",
     "RoomStateEvent",
     "RoomType",
@@ -134,4 +137,8 @@ __all__ = [
     "UserRole",
     "WakeUpCall",
     "Invoice",
+    "BlackGuest",
+    "BreakfastTicket",
+    "Coupon",
+    "CouponTemplate",
 ]

@@ -4,13 +4,37 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.room_state import InvalidTransition, RoomState, RoomTrigger, next_state
 from app.events.base import RoomStateChanged, utc_now
 from app.events.bus import event_bus
-from app.models import AuditLog, Booking, Complaint, HousekeepingTask, Room, RoomStateEvent
+from app.models import (
+    AuditLog,
+    Booking,
+    Complaint,
+    HousekeepingTask,
+    Room,
+    RoomAttribute,
+    RoomStateEvent,
+)
+
+# ---------- M37-④ 房间属性码表（维也纳 RoomAttribute / RoomDescript 合并命名空间） ----------
+# 未知编码降级为编码本身，保证前端新增属性不至于写不进库。
+ATTRIBUTE_NAMES: dict[str, str] = {
+    "SMOKE_FREE": "无烟房",
+    "BIG_BED": "大床",
+    "TWIN_BED": "双床",
+    "WINDOW": "有窗",
+    "NO_WINDOW": "无窗",
+    "HIGH_FLOOR": "高层",
+    "LOW_FLOOR": "低层",
+    "QUIET": "安静",
+    "NEAR_ELEVATOR": "近电梯",
+    "NEAR_STAIRS": "近楼梯",
+    "ACCESSIBLE": "无障碍",
+}
 
 
 class RoomService:
@@ -245,5 +269,109 @@ class RoomService:
         scored.sort(key=lambda x: (-x["score"], x["room_no"]))
         return scored[:max(limit, 1)]
 
+    # ---- 房间属性（M37-④）：全量覆盖写 + 排房过滤读 ----
 
-__all__ = ["InvalidTransition", "RoomService"]
+    async def set_room_attributes(
+        self,
+        tenant_id: str,
+        hotel_id: int,
+        room_id: int,
+        codes: list[str],
+        memo: str | None = None,
+        operator: str = "front_desk",
+    ) -> list[RoomAttribute]:
+        """幂等全量覆盖：先软删现有属性，再按 ``codes`` 重建。
+
+        因 ``UQ(tenant_id, room_id, attribute_code)``，同编码不可重复插行——
+        故已存在（含历史软删）的行改为**复活**（置 ``is_valid=True``）并刷新备注，
+        其余行置 ``is_valid=False``，实现「一次 PUT 就是最终态」。
+        """
+        room = await self.session.get(Room, room_id)
+        if room is None or room.tenant_id != tenant_id:
+            raise ValueError("房间不存在")
+        room_no = room.room_no
+
+        existing = (
+            await self.session.execute(
+                select(RoomAttribute).where(
+                    RoomAttribute.tenant_id == tenant_id,
+                    RoomAttribute.room_id == room_id,
+                )
+            )
+        ).scalars().all()
+        by_code = {row.attribute_code: row for row in existing}
+
+        wanted: list[str] = []
+        for code in codes or []:
+            code = (code or "").strip()  # noqa: PLW2901 - 归一化入参
+            if code and code not in wanted:
+                wanted.append(code)
+
+        result: list[RoomAttribute] = []
+        for row in existing:
+            if row.attribute_code not in wanted and row.is_valid:
+                row.is_valid = False
+                row.operator = operator
+                self.session.add(row)
+        for code in wanted:
+            row = by_code.get(code)
+            if row is None:
+                row = RoomAttribute(
+                    tenant_id=tenant_id,
+                    hotel_id=hotel_id or room.hotel_id,
+                    room_id=room_id,
+                    room_no=room_no,
+                    attribute_code=code,
+                    attribute_name=ATTRIBUTE_NAMES.get(code, code),
+                    is_valid=True,
+                    operator=operator,
+                    memo=memo,
+                )
+            else:
+                row.is_valid = True
+                row.room_no = room_no
+                row.attribute_name = ATTRIBUTE_NAMES.get(code, code)
+                row.operator = operator
+                row.memo = memo
+            self.session.add(row)
+            result.append(row)
+        await self.session.flush()
+        return result
+
+    async def list_room_attributes(self, tenant_id: str, room_id: int) -> list[RoomAttribute]:
+        """某房间的生效属性（软删的不返回）。"""
+        result = await self.session.execute(
+            select(RoomAttribute)
+            .where(
+                RoomAttribute.tenant_id == tenant_id,
+                RoomAttribute.room_id == room_id,
+                RoomAttribute.is_valid.is_(True),
+            )
+            .order_by(RoomAttribute.id.asc())
+        )
+        return list(result.scalars())
+
+    async def list_rooms_by_attributes(self, tenant_id: str, codes: list[str]) -> list[str]:
+        """排房过滤：返回**同时具备**全部 ``codes`` 的房号（去重，升序）。
+
+        ``codes`` 为空时返回空列表（不放大成全量房，避免前端误当「不限」）。
+        """
+        wanted = [c for c in (codes or []) if c]
+        if not wanted:
+            return []
+        stmt = (
+            select(RoomAttribute.room_no)
+            .where(
+                RoomAttribute.tenant_id == tenant_id,
+                RoomAttribute.is_valid.is_(True),
+                RoomAttribute.attribute_code.in_(wanted),
+            )
+            .group_by(RoomAttribute.room_no)
+            .having(func.count(distinct(RoomAttribute.attribute_code)) == len(wanted))
+            .order_by(RoomAttribute.room_no.asc())
+        )
+        result = await self.session.execute(stmt)
+        return [row[0] for row in result.all()]
+
+
+__all__ = ["ATTRIBUTE_NAMES", "InvalidTransition", "RoomService"]

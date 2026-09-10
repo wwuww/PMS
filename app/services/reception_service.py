@@ -112,7 +112,10 @@ class ReceptionService:
             booking.guarantee_hold_until = guarantee_hold_until
             self.session.add(booking)
             await self.session.flush()
-            return await bs.check_in(booking, room_no, operator=operator)
+            checked = await bs.check_in(booking, room_no, operator=operator)
+            # M37-④ D1：黑名单仅提醒不阻断（写入审计，前台提示层消费）
+            await self._warn_blacklist(checked, operator)
+            return checked
 
         # ---- 散客模式 ----
         if not (room_type_id and guest_name and check_in_date and check_out_date):
@@ -165,6 +168,18 @@ class ReceptionService:
             guarantee_hold_until=guarantee_hold_until,
         )
         return await bs.check_in(booking, room_no, operator=operator)
+
+    async def _warn_blacklist(self, booking: Booking, operator: str) -> None:
+        """黑名单命中提醒（M37-④ D1：**仅提醒，不硬阻断**）。
+
+        入住路径（预订模式）在建单期不会触发 ``BookingService.create``，故在此补一次；
+        散客模式由 ``BookingService.create`` 内部已触发，重复调用无副作用（幂等审计）。
+        任何异常都吞掉，绝不阻断入住主流程。
+        """
+        try:
+            await BookingService(self.session)._warn_blacklist(booking, operator)  # noqa: SLF001
+        except Exception:  # noqa: BLE001 - 提醒失败绝不阻断入住
+            pass
 
     # ---------- R1 · 单客上下文只读聚合 ----------
 

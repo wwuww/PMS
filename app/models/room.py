@@ -98,3 +98,32 @@ class RoomChange(IntPkMixin, TenantMixin, TimestampMixin, Base):
     reason: Mapped[str] = mapped_column(String(64), nullable=False)  # 换房原因（审计刚需）
     business_date: Mapped[str] = mapped_column(String(10), nullable=False)  # 营业日
     operator: Mapped[str] = mapped_column(String(64), nullable=False, default="front_desk")
+
+
+class RoomAttribute(IntPkMixin, TenantMixin, TimestampMixin, Base):
+    """房间属性（M37-④）。
+
+    维也纳 ``RoomAttribute``(9) + ``RoomDescript``(6) 合并为一张表：后者用
+    ``attribute_code`` 的 ``DESC:*`` 命名空间区分（两表结构同构，拆表只增加 JOIN 成本）。
+    ``room_no`` 冗余存储以避免排房时 JOIN；``UQ(tenant_id, room_id, attribute_code)``
+    保证同房间同属性不重复。
+    """
+
+    __tablename__ = "room_attributes"
+
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id", "room_id", "attribute_code", name="uq_room_attr_tenant_room_code"
+        ),
+        Index("ix_room_attr_tenant_room", "tenant_id", "room_no"),
+        Index("ix_room_attr_tenant_code", "tenant_id", "attribute_code", "is_valid"),
+    )
+
+    hotel_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("hotels.id"), nullable=False)
+    room_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("rooms.id"), nullable=False)
+    room_no: Mapped[str] = mapped_column(String(16), nullable=False)
+    attribute_code: Mapped[str] = mapped_column(String(16), nullable=False)  # SMOKE_FREE/BIG_BED/WINDOW/DESC:* 等
+    attribute_name: Mapped[str] = mapped_column(String(64), nullable=False)
+    is_valid: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    operator: Mapped[str] = mapped_column(String(64), nullable=False, default="front_desk")
+    memo: Mapped[str | None] = mapped_column(String(128), nullable=True)

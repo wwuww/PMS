@@ -133,6 +133,13 @@ import type {
   InvoiceVoidIn,
   RoomChange,
   StayExtension,
+  // 批次④：早餐券 / 优惠券 / 房间属性 / 黑名单
+  RoomAttribute,
+  BlackGuest,
+  BlacklistHit,
+  BreakfastTicket,
+  CouponTemplate,
+  Coupon,
 } from "./types";
 
 export async function listTenants(): Promise<Tenant[]> {
@@ -2788,6 +2795,340 @@ export async function listStayExtensionsByBooking(
 ): Promise<StayExtension[]> {
   const { data } = await http.get<StayExtension[]>(
     `/tenants/${tenantCode}/bookings/${bookingId}/stay-extensions`
+  );
+  return data;
+}
+
+// ---------- 批次④：房间属性 / 黑名单 / 早餐券 / 优惠券 ----------
+
+// ==== 房间属性（room attributes） ====
+
+/** 查询单个房间的属性列表。 */
+export async function listRoomAttributes(
+  tenantCode: string,
+  roomId: number | string
+): Promise<RoomAttribute[]> {
+  const { data } = await http.get<RoomAttribute[]>(
+    `/tenants/${tenantCode}/rooms/${roomId}/attributes`
+  );
+  return data;
+}
+
+export interface RoomAttributesSetBody {
+  codes: string[];
+  memo?: string | null;
+  operator?: string;
+}
+
+/** 全量覆盖设置房间属性（传空数组即清空）。 */
+export async function setRoomAttributes(
+  tenantCode: string,
+  roomId: number | string,
+  body: RoomAttributesSetBody
+): Promise<RoomAttribute[]> {
+  const { data } = await http.put<RoomAttribute[]>(
+    `/tenants/${tenantCode}/rooms/${roomId}/attributes`,
+    body
+  );
+  return data;
+}
+
+/**
+ * 按属性组合检索房间：返回同时满足全部 code 的房间属性行（RoomAttribute[]）。
+ * 后端可能仅回填 room_no，故消费方需按 room_no 兜底匹配。
+ */
+export async function listRoomsByAttributes(
+  tenantCode: string,
+  codes: string[]
+): Promise<RoomAttribute[]> {
+  const { data } = await http.get<RoomAttribute[]>(
+    `/tenants/${tenantCode}/room-attributes`,
+    { params: { code: codes } }
+  );
+  return data;
+}
+
+// ==== 黑名单（blacklist.manage） ====
+
+export async function listBlacklist(
+  tenantCode: string,
+  params?: {
+    name?: string;
+    id_no?: string;
+    level?: number;
+    is_valid?: boolean;
+  }
+): Promise<BlackGuest[]> {
+  const qs: Record<string, unknown> = {};
+  if (params?.name) qs.name = params.name;
+  if (params?.id_no) qs.id_no = params.id_no;
+  if (params?.level != null) qs.level = params.level;
+  if (params?.is_valid != null) qs.is_valid = params.is_valid;
+  const { data } = await http.get<BlackGuest[]>(
+    `/tenants/${tenantCode}/blacklist`,
+    { params: qs }
+  );
+  return data;
+}
+
+export interface BlackGuestCreateBody {
+  hotel_id?: number | string | null;
+  name: string;
+  id_no?: string | null;
+  phone?: string | null;
+  reason: string;
+  level?: number | null;
+  operator?: string;
+}
+
+/** 加入黑名单（201）。 */
+export async function createBlackGuest(
+  tenantCode: string,
+  body: BlackGuestCreateBody
+): Promise<BlackGuest> {
+  const { data } = await http.post<BlackGuest>(
+    `/tenants/${tenantCode}/blacklist`,
+    body
+  );
+  return data;
+}
+
+/** 移出黑名单（WORM：置 is_valid=false）。 */
+export async function deleteBlackGuest(
+  tenantCode: string,
+  id: number | string
+): Promise<void> {
+  await http.delete(`/tenants/${tenantCode}/blacklist/${id}`);
+}
+
+/** 入住/建档前黑名单命中检查。 */
+export async function checkBlacklist(
+  tenantCode: string,
+  opts: { name?: string; id_no?: string; phone?: string }
+): Promise<{ hits: BlacklistHit[] }> {
+  const params: Record<string, unknown> = {};
+  if (opts.name) params.name = opts.name;
+  if (opts.id_no) params.id_no = opts.id_no;
+  if (opts.phone) params.phone = opts.phone;
+  const { data } = await http.get<{ hits: BlacklistHit[] }>(
+    `/tenants/${tenantCode}/blacklist/check`,
+    { params }
+  );
+  return data;
+}
+
+// ==== 早餐券（breakfast.manage） ====
+
+export interface BreakfastIssueBody {
+  booking_id?: number | string | null;
+  room_no?: string | null;
+  ticket_type: number; // 0 送早 / 5 兑早 / 9 购早
+  ticket_type_name?: string | null;
+  count: number;
+  valid_from?: string | null;
+  valid_to?: string | null;
+  card_type?: string | null;
+  memo?: string | null;
+  operator?: string;
+}
+
+/** 批量发早餐券（201，返回本次生成的全部券）。 */
+export async function issueBreakfastTickets(
+  tenantCode: string,
+  body: BreakfastIssueBody
+): Promise<BreakfastTicket[]> {
+  const { data } = await http.post<BreakfastTicket[]>(
+    `/tenants/${tenantCode}/breakfast-tickets/issue`,
+    body
+  );
+  return data;
+}
+
+export interface BreakfastUseBody {
+  ticket_no: string;
+  business_date: string;
+  operator?: string;
+}
+
+/** 核销早餐券（重复核销由后端 400 拦截并给出原因）。 */
+export async function useBreakfastTicket(
+  tenantCode: string,
+  body: BreakfastUseBody
+): Promise<BreakfastTicket> {
+  const { data } = await http.post<BreakfastTicket>(
+    `/tenants/${tenantCode}/breakfast-tickets/use`,
+    body
+  );
+  return data;
+}
+
+/** 作废早餐券。 */
+export async function voidBreakfastTicket(
+  tenantCode: string,
+  id: number | string,
+  body: { reason?: string | null; operator?: string } = {}
+): Promise<BreakfastTicket> {
+  const { data } = await http.post<BreakfastTicket>(
+    `/tenants/${tenantCode}/breakfast-tickets/${id}/void`,
+    body
+  );
+  return data;
+}
+
+/** 早餐券列表（多维筛选）。 */
+export async function listBreakfastTickets(
+  tenantCode: string,
+  params?: {
+    booking_id?: number | string;
+    ticket_type?: number;
+    is_used?: boolean;
+    date_from?: string;
+    date_to?: string;
+    hotel_id?: number | string;
+    limit?: number;
+    offset?: number;
+  }
+): Promise<BreakfastTicket[]> {
+  const qs: Record<string, unknown> = {};
+  if (params?.booking_id != null && params.booking_id !== "")
+    qs.booking_id = params.booking_id;
+  if (params?.ticket_type != null) qs.ticket_type = params.ticket_type;
+  if (params?.is_used != null) qs.is_used = params.is_used;
+  if (params?.date_from) qs.date_from = params.date_from;
+  if (params?.date_to) qs.date_to = params.date_to;
+  if (params?.hotel_id != null) qs.hotel_id = params.hotel_id;
+  if (params?.limit != null) qs.limit = params.limit;
+  if (params?.offset != null) qs.offset = params.offset;
+  const { data } = await http.get<BreakfastTicket[]>(
+    `/tenants/${tenantCode}/breakfast-tickets`,
+    { params: qs }
+  );
+  return data;
+}
+
+// ==== 优惠券（coupon.manage） ====
+
+/** 券模板列表。 */
+export async function listCouponTemplates(
+  tenantCode: string,
+  params?: { hotel_id?: number | string; is_valid?: boolean }
+): Promise<CouponTemplate[]> {
+  const qs: Record<string, unknown> = {};
+  if (params?.hotel_id != null) qs.hotel_id = params.hotel_id;
+  if (params?.is_valid != null) qs.is_valid = params.is_valid;
+  const { data } = await http.get<CouponTemplate[]>(
+    `/tenants/${tenantCode}/coupon-templates`,
+    { params: qs }
+  );
+  return data;
+}
+
+export interface CouponTemplateCreateBody {
+  hotel_id?: number | string | null;
+  code: string;
+  name: string;
+  ticket_type?: string | null; // VOUCHER | FREE
+  discount_type?: string | null; // AMOUNT | PERCENT | FIXED_PRICE
+  discount_value?: number | null;
+  valid_from: string;
+  valid_to: string;
+  total_quantity?: number | null;
+  operator?: string;
+}
+
+/** 新建券模板（201）。 */
+export async function createCouponTemplate(
+  tenantCode: string,
+  body: CouponTemplateCreateBody
+): Promise<CouponTemplate> {
+  const { data } = await http.post<CouponTemplate>(
+    `/tenants/${tenantCode}/coupon-templates`,
+    body
+  );
+  return data;
+}
+
+export interface CouponIssueBody {
+  hotel_id?: number | string | null;
+  template_id?: number | string | null;
+  count: number;
+  ticket_type?: string | null;
+  discount_type?: string | null;
+  discount_value?: number | null;
+  valid_from?: string | null;
+  valid_to?: string | null;
+  is_cover_other_discount?: boolean;
+  is_transfer_to_account?: boolean;
+  operator?: string;
+}
+
+/** 批量发券（201，返回本次生成的全部券实例）。选择模板时规则由后端带出，散券则手填。 */
+export async function issueCoupons(
+  tenantCode: string,
+  body: CouponIssueBody
+): Promise<Coupon[]> {
+  const { data } = await http.post<Coupon[]>(
+    `/tenants/${tenantCode}/coupons`,
+    body
+  );
+  return data;
+}
+
+export interface CouponUseBody {
+  coupon_no: string;
+  booking_id?: number | string | null;
+  bill_id?: number | string | null;
+  operator?: string;
+}
+
+/** 核销优惠券（重复核销由后端 400 拦截）。 */
+export async function useCoupon(
+  tenantCode: string,
+  body: CouponUseBody
+): Promise<Coupon> {
+  const { data } = await http.post<Coupon>(
+    `/tenants/${tenantCode}/coupons/use`,
+    body
+  );
+  return data;
+}
+
+/** 作废优惠券。 */
+export async function voidCoupon(
+  tenantCode: string,
+  id: number | string,
+  body: { reason?: string | null; operator?: string } = {}
+): Promise<Coupon> {
+  const { data } = await http.post<Coupon>(
+    `/tenants/${tenantCode}/coupons/${id}/void`,
+    body
+  );
+  return data;
+}
+
+/** 券实例列表（多维筛选）。 */
+export async function listCoupons(
+  tenantCode: string,
+  params?: {
+    status?: string;
+    booking_id?: number | string;
+    coupon_no?: string;
+    hotel_id?: number | string;
+    limit?: number;
+    offset?: number;
+  }
+): Promise<Coupon[]> {
+  const qs: Record<string, unknown> = {};
+  if (params?.status) qs.status = params.status;
+  if (params?.booking_id != null && params.booking_id !== "")
+    qs.booking_id = params.booking_id;
+  if (params?.coupon_no) qs.coupon_no = params.coupon_no;
+  if (params?.hotel_id != null) qs.hotel_id = params.hotel_id;
+  if (params?.limit != null) qs.limit = params.limit;
+  if (params?.offset != null) qs.offset = params.offset;
+  const { data } = await http.get<Coupon[]>(
+    `/tenants/${tenantCode}/coupons`,
+    { params: qs }
   );
   return data;
 }

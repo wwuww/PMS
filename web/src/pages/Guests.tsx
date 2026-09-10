@@ -7,6 +7,7 @@ import {
   Drawer,
   Form,
   Input,
+  Modal,
   Select,
   Space,
   Table,
@@ -16,7 +17,9 @@ import {
 import type { ColumnsType } from "antd/es/table";
 import { useTenant } from "../store/tenant";
 import {
+  createBlackGuest,
   createGuest,
+  listBlacklist,
   listGuests,
   listHotels,
   searchGuests,
@@ -24,10 +27,25 @@ import {
   type GuestCreateBody,
 } from "../api/endpoints";
 import type {
+  BlackGuest,
   Guest,
   GuestIdType,
   GuestVipLevel,
 } from "../api/types";
+import { currentOperator, useCan } from "../utils/permission";
+
+/** 黑名单等级：0 提示 / 1 警告 / 2 限制 / 3 拒绝入住。 */
+const BLACK_LEVEL_OPTIONS = [
+  { value: 0, label: "0 提示" },
+  { value: 1, label: "1 警告" },
+  { value: 2, label: "2 限制" },
+  { value: 3, label: "3 拒绝入住" },
+];
+
+/** 归一化比较键：去空白 + 转大写（证件号含字母）。 */
+function normKey(v?: string | null): string {
+  return (v || "").replace(/\s+/g, "").toUpperCase();
+}
 
 const VIP_LABEL: Record<GuestVipLevel, string> = {
   NORMAL: "普通",
@@ -60,11 +78,54 @@ export default function GuestsPage() {
   const { tenantCode } = useTenant();
   const navigate = useNavigate();
   const { message } = AntApp.useApp();
+  const canBlacklist = useCan("BLACKLIST_MANAGE");
 
   const [list, setList] = useState<Guest[]>([]);
   const [loading, setLoading] = useState(false);
   const [keyword, setKeyword] = useState("");
   const [hotels, setHotels] = useState<{ id: string; name: string }[]>([]);
+
+  // 批次④：黑名单（一次拉取全量名单，客户端按姓名/证件号/手机号匹配，避免 N 次 check 请求）
+  const [blacklist, setBlacklist] = useState<BlackGuest[]>([]);
+  const [blackOpen, setBlackOpen] = useState(false);
+  const [blackTarget, setBlackTarget] = useState<Guest | null>(null);
+  const [blackSaving, setBlackSaving] = useState(false);
+  const [blackForm] = Form.useForm();
+
+  const loadBlacklist = async () => {
+    if (!tenantCode) return;
+    try {
+      const data = await listBlacklist(tenantCode, { is_valid: true });
+      setBlacklist(Array.isArray(data) ? data : []);
+    } catch {
+      // 黑名单加载失败不阻断宾客档案：仅不展示黑名单标签
+      setBlacklist([]);
+    }
+  };
+
+  /** 命中黑名单则返回该条记录（证件号 > 手机号 > 姓名）。 */
+  const blackHit = useMemo(() => {
+    const byIdNo = new Map<string, BlackGuest>();
+    const byPhone = new Map<string, BlackGuest>();
+    const byName = new Map<string, BlackGuest>();
+    blacklist.forEach((b) => {
+      const idk = normKey(b.id_no);
+      const pk = normKey(b.phone);
+      const nk = normKey(b.name);
+      if (idk) byIdNo.set(idk, b);
+      if (pk) byPhone.set(pk, b);
+      if (nk) byName.set(nk, b);
+    });
+    return (g: Guest): BlackGuest | undefined => {
+      const idk = normKey(g.id_no);
+      const pk = normKey(g.phone);
+      const nk = normKey(g.name);
+      if (idk && byIdNo.has(idk)) return byIdNo.get(idk);
+      if (pk && byPhone.has(pk)) return byPhone.get(pk);
+      if (nk && byName.has(nk)) return byName.get(nk);
+      return undefined;
+    };
+  }, [blacklist]);
 
   const loadHotels = async () => {
     if (!tenantCode) return;
@@ -100,8 +161,44 @@ export default function GuestsPage() {
   useEffect(() => {
     void load();
     void loadHotels();
+    void loadBlacklist();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantCode, keyword]);
+
+  const openBlacklist = (g: Guest) => {
+    setBlackTarget(g);
+    setBlackOpen(true);
+    blackForm.resetFields();
+    blackForm.setFieldsValue({
+      level: 2,
+      hotel_id: g.hotel_id != null ? Number(g.hotel_id) : undefined,
+    });
+  };
+
+  const submitBlacklist = async () => {
+    const v = await blackForm.validateFields();
+    if (!blackTarget) return;
+    setBlackSaving(true);
+    try {
+      await createBlackGuest(tenantCode, {
+        hotel_id: v.hotel_id ?? null,
+        name: blackTarget.name,
+        id_no: blackTarget.id_no ?? null,
+        phone: blackTarget.phone ?? null,
+        reason: String(v.reason || "").trim(),
+        level: v.level ?? 0,
+        operator: currentOperator(),
+      });
+      message.success(`${blackTarget.name} 已加入黑名单`);
+      setBlackOpen(false);
+      blackForm.resetFields();
+      await loadBlacklist();
+    } catch (e: unknown) {
+      message.error((e as Error).message || "加入黑名单失败");
+    } finally {
+      setBlackSaving(false);
+    }
+  };
 
   const hotelName = useMemo(() => {
     const m = new Map(hotels.map((h) => [h.id, h.name]));
@@ -232,16 +329,26 @@ export default function GuestsPage() {
     {
       title: "姓名",
       dataIndex: "name",
-      render: (name: string, g) => (
-        <a
-          onClick={() => {
-            setKeyword(name);
-            void quickSearch(name);
-          }}
-        >
-          {name}
-        </a>
-      ),
+      render: (name: string, g: Guest) => {
+        const hit = blackHit(g);
+        return (
+          <Space size={4}>
+            <a
+              onClick={() => {
+                setKeyword(name);
+                void quickSearch(name);
+              }}
+            >
+              {name}
+            </a>
+            {hit && (
+              <Tag color="red" title={hit.reason || undefined}>
+                黑名单
+              </Tag>
+            )}
+          </Space>
+        );
+      },
     },
     { title: "手机号", dataIndex: "phone", render: (p: string | null) => p || "—" },
     {
@@ -302,9 +409,19 @@ export default function GuestsPage() {
       title: "操作",
       key: "op",
       render: (_: unknown, g: Guest) => (
-        <Button type="link" onClick={() => openEdit(g)}>
-          编辑
-        </Button>
+        <Space size={4}>
+          <Button type="link" onClick={() => openEdit(g)}>
+            编辑
+          </Button>
+          <Button
+            type="link"
+            danger
+            disabled={!canBlacklist}
+            onClick={() => openBlacklist(g)}
+          >
+            加入黑名单
+          </Button>
+        </Space>
       ),
     },
   ];
@@ -338,6 +455,47 @@ export default function GuestsPage() {
           size="middle"
         />
       </Card>
+
+      {/* 批次④：加入黑名单 */}
+      <Modal
+        title={blackTarget ? `加入黑名单 - ${blackTarget.name}` : "加入黑名单"}
+        open={blackOpen}
+        onOk={() => void submitBlacklist()}
+        onCancel={() => setBlackOpen(false)}
+        okText="确认加入"
+        cancelText="取消"
+        confirmLoading={blackSaving}
+        destroyOnClose
+      >
+        <Form form={blackForm} layout="vertical" preserve={false}>
+          <Form.Item label="宾客">
+            <Input value={blackTarget?.name ?? ""} readOnly disabled />
+          </Form.Item>
+          <Form.Item label="证件号">
+            <Input value={blackTarget?.id_no ?? ""} readOnly disabled />
+          </Form.Item>
+          <Form.Item label="手机号">
+            <Input value={blackTarget?.phone ?? ""} readOnly disabled />
+          </Form.Item>
+          <Form.Item
+            name="reason"
+            label="原因"
+            rules={[{ required: true, message: "请填写加入黑名单的原因" }]}
+          >
+            <Input.TextArea rows={3} maxLength={255} placeholder="如：恶意逃单 / 损坏房间设施" />
+          </Form.Item>
+          <Form.Item name="level" label="等级">
+            <Select options={BLACK_LEVEL_OPTIONS} />
+          </Form.Item>
+          <Form.Item name="hotel_id" label="适用门店（不选=全租户生效）">
+            <Select
+              allowClear
+              placeholder="全租户"
+              options={hotels.map((h) => ({ label: h.name, value: Number(h.id) }))}
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
 
       <Drawer
         title={editing ? "编辑宾客档案" : "新建宾客档案"}

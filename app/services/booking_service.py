@@ -193,7 +193,41 @@ class BookingService:
                 channel=channel,
             )
         )
+        await self._warn_blacklist(booking, operator)
         return booking
+
+    async def _warn_blacklist(self, booking: Booking, operator: str) -> None:
+        """黑名单命中提醒（M37-④ D1：**仅提醒，不硬阻断**）。
+
+        命中即写一条 ``guest.blacklist_warning`` 审计（WORM 留痕），由前台/经理在前台
+        提示中自行判断；任何异常都吞掉，绝不影响建单主流程。
+        """
+        try:
+            hits = await GuestService(self.session).check_blacklist(
+                booking.tenant_id,
+                name=booking.guest_name,
+                id_no=booking.id_doc_no,
+                phone=booking.guest_phone,
+                hotel_id=booking.hotel_id,
+            )
+            if not hits:
+                return
+            from app.services.audit_service import record as _audit_record  # noqa: PLC0415
+
+            await _audit_record(
+                self.session,
+                booking.tenant_id,
+                "guest.blacklist_warning",
+                actor=operator or "front_desk",
+                resource_type="booking",
+                resource_id=booking.id,
+                hotel_id=booking.hotel_id,
+                result="success",
+                detail={"guest_name": booking.guest_name, "hits": hits},
+            )
+            await self.session.commit()
+        except Exception:  # noqa: BLE001 - 提醒失败绝不阻断建单
+            pass
 
     async def check_in(
         self, booking: Booking, room_no: str, operator: str = "front_desk"

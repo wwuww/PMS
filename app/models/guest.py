@@ -81,3 +81,33 @@ class Guest(IntPkMixin, TenantMixin, TimestampMixin, Base):
 
     def set_tags(self, values: list[str]) -> None:
         self.tags = json.dumps(list(values or []), ensure_ascii=False)
+
+
+class BlackGuest(IntPkMixin, TenantMixin, TimestampMixin, Base):
+    """黑名单客人（M37-④，WORM：移出=软删 is_valid=False）。
+
+    匹配优先级：``id_no`` > ``phone`` > ``name``（姓名误伤率高，仅 id_no/phone
+    命中才算强命中）。默认**仅提醒不硬阻断**（D1），由调用方决定是否拦截。
+    ``hotel_id`` 为空 = 全集团生效。
+    """
+
+    __tablename__ = "black_guests"
+
+    __table_args__ = (
+        Index("ix_black_tenant_name", "tenant_id", "name"),
+        Index("ix_black_tenant_idno", "tenant_id", "id_no"),
+        Index("ix_black_tenant_phone", "tenant_id", "phone"),
+        Index("ix_black_tenant_valid_level", "tenant_id", "is_valid", "level"),
+    )
+
+    hotel_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("hotels.id"), nullable=True
+    )  # 空 = 全集团生效
+    name: Mapped[str] = mapped_column(String(64), nullable=False)
+    id_no: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    reason: Mapped[str] = mapped_column(String(255), nullable=False)
+    level: Mapped[int] = mapped_column(Integer, nullable=False, default=0)  # 0-3，3 最重
+    is_valid: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    operator: Mapped[str] = mapped_column(String(64), nullable=False, default="front_desk")
+

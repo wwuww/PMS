@@ -1,9 +1,9 @@
 {
   "generated_at": "2026-09-07T06:52:45+00:00",
-  "total_routes": 195,
+  "total_routes": 196,
   "protected_count": 30,
-  "unprotected_count": 165,
-  "unprotected_writes_count": 88,
+  "unprotected_count": 166,
+  "unprotected_writes_count": 89,
   "unprotected_reads_count": 77,
   "items": [
     {
@@ -1173,6 +1173,12 @@
     {
       "method": "PUT",
       "path": "/api/v1/tenants/{tenant_id}/yield/rules",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/tenants/{tenant_id}/rooms/{room_id}/attributes",
       "has_perm": false,
       "is_write": true
     }

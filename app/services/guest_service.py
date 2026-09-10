@@ -12,7 +12,7 @@ from datetime import date
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Booking, Guest, Member
+from app.models import BlackGuest, Booking, Guest, Member
 from app.services.member_service import MemberService
 
 
@@ -248,3 +248,131 @@ class GuestService:
         await self._link_member_by_phone(guest, phone)
         await self.session.flush()
         return guest
+
+    # ---------- 黑名单（M37-④，D1：仅提醒不硬阻断） ----------
+
+    async def add_blacklist(
+        self,
+        tenant_id: str,
+        name: str,
+        reason: str,
+        hotel_id: int | None = None,
+        id_no: str | None = None,
+        phone: str | None = None,
+        level: int = 0,
+        operator: str = "front_desk",
+    ) -> BlackGuest:
+        """加入黑名单（``hotel_id`` 为空表示全集团生效）。"""
+        if not (name or "").strip():
+            raise ValueError("黑名单姓名必填")
+        if not (reason or "").strip():
+            raise ValueError("拉黑原因必填")
+        if level < 0 or level > 3:
+            raise ValueError("黑名单等级须为 0-3")
+        row = BlackGuest(
+            tenant_id=tenant_id,
+            hotel_id=hotel_id,
+            name=name.strip(),
+            id_no=(id_no or None),
+            phone=(phone or None),
+            reason=reason.strip(),
+            level=level,
+            is_valid=True,
+            operator=operator,
+        )
+        self.session.add(row)
+        await self.session.flush()
+        return row
+
+    async def remove_blacklist(
+        self, tenant_id: str, black_id: int, operator: str = "front_desk"
+    ) -> BlackGuest:
+        """移出黑名单（WORM 软删：仅置 ``is_valid=False``）。"""
+        row = await self.session.get(BlackGuest, black_id)
+        if row is None or row.tenant_id != tenant_id:
+            raise ValueError("黑名单记录不存在")
+        row.is_valid = False
+        row.operator = operator
+        self.session.add(row)
+        await self.session.flush()
+        return row
+
+    async def check_blacklist(
+        self,
+        tenant_id: str,
+        name: str | None = None,
+        id_no: str | None = None,
+        phone: str | None = None,
+        hotel_id: int | None = None,
+    ) -> list[dict]:
+        """黑名单命中检查（**仅提醒**，调用方决定是否阻断）。
+
+        匹配优先级：``id_no`` > ``phone`` > ``name``；``id_no``/``phone`` 命中为
+        **强命中**（``strong=True``），姓名误伤率高仅作弱提示。
+        生效范围：``hotel_id`` 为空（全集团）或等于当前门店。
+        返回 ``BlacklistHit`` 结构字典列表（按 id 去重、level 倒序）。
+        """
+        if not (name or id_no or phone):
+            return []
+        found: dict[int, dict] = {}
+
+        async def _query(key: str, value: str) -> None:
+            stmt = select(BlackGuest).where(
+                BlackGuest.tenant_id == tenant_id,
+                BlackGuest.is_valid.is_(True),
+                getattr(BlackGuest, key) == value,
+            )
+            if hotel_id is not None:
+                stmt = stmt.where(
+                    or_(BlackGuest.hotel_id.is_(None), BlackGuest.hotel_id == hotel_id)
+                )
+            rows = (await self.session.execute(stmt)).scalars().all()
+            for row in rows:
+                if row.id in found:
+                    continue  # 已在更高优先级命中
+                found[row.id] = {
+                    "id": row.id,
+                    "name": row.name,
+                    "reason": row.reason,
+                    "level": row.level,
+                    "matched_by": key,
+                    "strong": key in ("id_no", "phone"),
+                }
+
+        # 强键优先：证件号 > 手机号 > 姓名
+        if id_no:
+            await _query("id_no", id_no)
+        if phone:
+            await _query("phone", phone)
+        if name:
+            await _query("name", name)
+        return sorted(found.values(), key=lambda x: (-int(x["level"]), int(x["id"])))
+
+    async def list_blacklist(
+        self,
+        tenant_id: str,
+        name: str | None = None,
+        id_no: str | None = None,
+        level: int | None = None,
+        is_valid: bool | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[BlackGuest]:
+        """黑名单列表（按 id 倒序，带 MAX_LIST_ROWS 硬上限护栏）。"""
+        from app.api.routes import MAX_LIST_ROWS  # noqa: PLC0415 - 延迟导入避免循环依赖
+
+        stmt = select(BlackGuest).where(BlackGuest.tenant_id == tenant_id)
+        if name:
+            stmt = stmt.where(BlackGuest.name.like(f"%{name}%"))
+        if id_no:
+            stmt = stmt.where(BlackGuest.id_no == id_no)
+        if level is not None:
+            stmt = stmt.where(BlackGuest.level == level)
+        if is_valid is not None:
+            stmt = stmt.where(BlackGuest.is_valid == is_valid)
+        stmt = stmt.order_by(BlackGuest.id.desc())
+        stmt = stmt.offset(max(0, offset)).limit(
+            MAX_LIST_ROWS if limit is None else max(1, min(limit, MAX_LIST_ROWS))
+        )
+        result = await self.session.execute(stmt)
+        return list(result.scalars())

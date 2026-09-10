@@ -1815,3 +1815,114 @@ export interface StayExtension {
   operator?: string;
   created_at?: string | null;
 }
+
+// ---------- 批次④：早餐券 / 优惠券 / 房间属性 / 黑名单 ----------
+
+/**
+ * 房间属性（RoomAttribute）。
+ * attribute_code 取值见 web/src/domain/roomAttributes.ts 的 ATTRIBUTE_OPTIONS。
+ */
+export interface RoomAttribute {
+  id?: number | string;
+  tenant_id?: string;
+  hotel_id?: number | string;
+  room_id?: number | string;
+  room_no?: string | null;
+  attribute_code?: string;
+  attribute_name?: string | null;
+  is_valid?: boolean;
+  operator?: string | null;
+  memo?: string | null;
+  created_at?: string | null;
+}
+
+/** 黑名单宾客（BlackGuest）。level：0 提示 / 1 警告 / 2 限制 / 3 拒绝入住。 */
+export interface BlackGuest {
+  id?: number | string;
+  tenant_id?: string;
+  hotel_id?: number | string | null;
+  name?: string;
+  id_no?: string | null;
+  phone?: string | null;
+  reason?: string;
+  level?: number | null;
+  is_valid?: boolean;
+  operator?: string | null;
+  created_at?: string | null;
+}
+
+/** 黑名单命中项（/blacklist/check 返回）。matched_by：name | id_no | phone。 */
+export interface BlacklistHit {
+  id?: number | string;
+  name?: string | null;
+  reason?: string | null;
+  level?: number | null;
+  matched_by?: string | null;
+  strong?: boolean;
+}
+
+/**
+ * 早餐券（BreakfastTicket）。
+ * ticket_type：0 送早 / 5 兑早 / 9 购早。
+ */
+export interface BreakfastTicket {
+  id?: number | string;
+  tenant_id?: string;
+  hotel_id?: number | string;
+  ticket_no?: string;
+  booking_id?: number | string | null;
+  room_no?: string | null;
+  card_type?: string | null;
+  ticket_type?: number;
+  ticket_type_name?: string | null;
+  valid_from?: string | null;
+  valid_to?: string | null;
+  used_business_date?: string | null;
+  is_used?: boolean;
+  is_valid?: boolean;
+  shift_id?: number | string | null;
+  operator?: string | null;
+  memo?: string | null;
+  created_at?: string | null;
+}
+
+/** 优惠券模板（CouponTemplate）。discount_value：AMOUNT=分，PERCENT=折扣百分比，FIXED_PRICE=分。 */
+export interface CouponTemplate {
+  id?: number | string;
+  tenant_id?: string;
+  hotel_id?: number | string | null;
+  code?: string;
+  name?: string;
+  ticket_type?: string | null; // VOUCHER | FREE
+  discount_type?: string | null; // AMOUNT | PERCENT | FIXED_PRICE
+  discount_value?: number | null;
+  valid_from?: string;
+  valid_to?: string;
+  total_quantity?: number | null;
+  issued_quantity?: number | null;
+  is_valid?: boolean;
+  operator?: string | null;
+  created_at?: string | null;
+}
+
+/** 优惠券实例（Coupon）。status：ISSUED | USED | VOID | EXPIRED。 */
+export interface Coupon {
+  id?: number | string;
+  tenant_id?: string;
+  hotel_id?: number | string;
+  template_id?: number | string | null;
+  coupon_no?: string;
+  ticket_type?: string | null;
+  discount_type?: string | null;
+  discount_value?: number | null;
+  valid_from?: string;
+  valid_to?: string;
+  status?: string | null;
+  booking_id?: number | string | null;
+  bill_id?: number | string | null;
+  used_at?: string | null;
+  is_cover_other_discount?: boolean;
+  is_transfer_to_account?: boolean;
+  operator?: string | null;
+  created_at?: string | null;
+}

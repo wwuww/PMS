@@ -2373,3 +2373,198 @@ class SearchResultOut(BaseModel):
     total: int
     by_type: dict[str, int]  # {"guest": 3, "booking": 2, ...} 各类型命中数
     query: str
+
+
+# ---------- M37-④ 早餐券 + 优惠券 + 房间属性 + 黑名单 ----------
+
+
+class RoomAttributeOut(BaseModel):
+    model_config = {"from_attributes": True}
+
+    id: int
+    tenant_id: str
+    hotel_id: int
+    room_id: int
+    room_no: str
+    attribute_code: str
+    attribute_name: str
+    is_valid: bool = True
+    operator: str = "front_desk"
+    memo: str | None = None
+    created_at: datetime | None = None
+
+
+class RoomAttributeIn(BaseModel):
+    """房间属性全量覆盖（幂等：先软删再插）。"""
+
+    codes: list[str] = Field(default_factory=list)
+    memo: str | None = Field(default=None, max_length=128)
+    operator: str = "front_desk"
+
+
+class BlackGuestIn(BaseModel):
+    """加入黑名单：姓名必填，证件号/手机号至少填一个（提高匹配精度）。"""
+
+    hotel_id: int | None = None  # 空 = 全集团生效
+    name: str = Field(min_length=1, max_length=64)
+    id_no: str | None = Field(default=None, max_length=64)
+    phone: str | None = Field(default=None, max_length=32)
+    reason: str = Field(min_length=1, max_length=255)
+    level: int = Field(default=0, ge=0, le=3)
+    operator: str = "front_desk"
+
+
+class BlackGuestOut(BaseModel):
+    model_config = {"from_attributes": True}
+
+    id: int
+    tenant_id: str
+    hotel_id: int | None = None
+    name: str
+    id_no: str | None = None
+    phone: str | None = None
+    reason: str
+    level: int = 0
+    is_valid: bool = True
+    operator: str = "front_desk"
+    created_at: datetime | None = None
+
+
+class BlacklistHit(BaseModel):
+    """黑名单命中项（仅提醒，不硬阻断）。"""
+
+    id: int
+    name: str
+    reason: str
+    level: int = 0
+    matched_by: str  # id_no|phone|name
+    strong: bool  # id_no/phone 命中才算强命中
+
+
+class BreakfastIssueIn(BaseModel):
+    """发早餐券（一次 count 张）。"""
+
+    booking_id: int | None = None
+    room_no: str | None = Field(default=None, max_length=16)
+    ticket_type: int = 0  # 0 送早 / 5 兑早 / 9 购早
+    ticket_type_name: str | None = Field(default=None, max_length=64)
+    count: int = Field(default=1, ge=1, le=100)
+    valid_from: str | None = Field(default=None, max_length=10)
+    valid_to: str | None = Field(default=None, max_length=10)
+    card_type: int = 0
+    memo: str | None = Field(default=None, max_length=255)
+    operator: str = "front_desk"
+
+
+class BreakfastUseIn(BaseModel):
+    """核销早餐券（幂等：已核销再核返回 409）。"""
+
+    ticket_no: str = Field(min_length=1, max_length=32)
+    business_date: str = Field(min_length=1, max_length=10)
+    operator: str = "front_desk"
+
+
+class BreakfastTicketOut(BaseModel):
+    model_config = {"from_attributes": True}
+
+    id: int
+    tenant_id: str
+    hotel_id: int
+    ticket_no: str
+    booking_id: int | None = None
+    room_no: str | None = None
+    card_type: int = 0
+    ticket_type: int = 0
+    ticket_type_name: str | None = None
+    valid_from: str | None = None
+    valid_to: str | None = None
+    used_business_date: str | None = None
+    is_used: bool = False
+    is_valid: bool = True
+    shift_id: int | None = None
+    operator: str = "front_desk"
+    memo: str | None = None
+    created_at: datetime | None = None
+
+
+class CouponTemplateIn(BaseModel):
+    """券模板（规则）。"""
+
+    hotel_id: int | None = None
+    code: str = Field(min_length=1, max_length=32)
+    name: str = Field(min_length=1, max_length=64)
+    ticket_type: str = Field(default="VOUCHER", max_length=8)
+    discount_type: str = Field(default="AMOUNT", max_length=16)
+    discount_value: int = Field(default=0, ge=0)
+    valid_from: str = Field(min_length=1, max_length=10)
+    valid_to: str = Field(min_length=1, max_length=10)
+    total_quantity: int = Field(default=0, ge=0)
+    operator: str = "front_desk"
+
+
+class CouponTemplateOut(BaseModel):
+    model_config = {"from_attributes": True}
+
+    id: int
+    tenant_id: str
+    hotel_id: int | None = None
+    code: str
+    name: str
+    ticket_type: str = "VOUCHER"
+    discount_type: str = "AMOUNT"
+    discount_value: int = 0
+    valid_from: str
+    valid_to: str
+    total_quantity: int = 0
+    issued_quantity: int = 0
+    is_valid: bool = True
+    operator: str = "front_desk"
+    created_at: datetime | None = None
+
+
+class CouponIn(BaseModel):
+    """发券（可指定模板批量，或散券直接给规则）。"""
+
+    hotel_id: int | None = None
+    template_id: int | None = None
+    count: int = Field(default=1, ge=1, le=1000)
+    ticket_type: str | None = Field(default=None, max_length=8)
+    discount_type: str | None = Field(default=None, max_length=16)
+    discount_value: int | None = Field(default=None, ge=0)
+    valid_from: str | None = Field(default=None, max_length=10)
+    valid_to: str | None = Field(default=None, max_length=10)
+    is_cover_other_discount: bool = False
+    is_transfer_to_account: bool = False
+    operator: str = "front_desk"
+
+
+class CouponUseIn(BaseModel):
+    """核销券。"""
+
+    coupon_no: str = Field(min_length=1, max_length=32)
+    booking_id: int | None = None
+    bill_id: int | None = None
+    operator: str = "front_desk"
+
+
+class CouponOut(BaseModel):
+    model_config = {"from_attributes": True}
+
+    id: int
+    tenant_id: str
+    hotel_id: int
+    template_id: int | None = None
+    coupon_no: str
+    ticket_type: str = "VOUCHER"
+    discount_type: str = "AMOUNT"
+    discount_value: int = 0
+    valid_from: str
+    valid_to: str
+    status: str = "ISSUED"
+    booking_id: int | None = None
+    bill_id: int | None = None
+    used_at: str | None = None
+    is_cover_other_discount: bool = False
+    is_transfer_to_account: bool = False
+    operator: str = "front_desk"
+    created_at: datetime | None = None

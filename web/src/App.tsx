@@ -47,6 +47,8 @@ import ArAccounts from "./pages/ArAccounts";
 import Deposits from "./pages/Deposits";
 import CheckInRegister from "./pages/CheckInRegister";
 import Invoices from "./pages/Invoices";
+import Breakfast from "./pages/Breakfast";
+import Coupons from "./pages/Coupons";
 
 /**
  * 布局内路由表（供 AppLayout 选项卡 keep-alive 渲染复用）。
@@ -99,6 +101,8 @@ export const layoutRoutes: RouteObject[] = [
   { path: "guests", element: <Guests /> },
   { path: "analytics", element: <Analytics /> },
   { path: "invoices", element: <Invoices /> },
+  { path: "breakfast", element: <Breakfast /> },
+  { path: "coupons", element: <Coupons /> },
   { path: "*", element: <NotFound /> },
 ];
 
