@@ -4,7 +4,7 @@ run_night_audit 流程（验收：夜审≤5分钟，单店可秒级）：
 1. 取/建 OPEN 营业日（已 CLOSED 则拒绝重复夜审）；
 2. 统计当日到店/离店；
 3. 遍历在住房：按价格库存中心解析当日房租并过账至账单（去重防重复过账），
-   会员房按房租累积积分；次日应离店房自动翻房（OCCUPIED→VACANT_DIRTY，预离）；
+   会员房按房租累积积分；在住房一律保持 OCCUPIED，房态只在真实退房时流转；
 4. 汇总杂费收入，生成不可变营业日报 DailyReport；
 5. 营业日置 CLOSED，发布 NightAuditCompleted 事件。
 """
@@ -12,7 +12,6 @@ run_night_audit 流程（验收：夜审≤5分钟，单店可秒级）：
 from __future__ import annotations
 
 import json
-from datetime import date, timedelta
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -106,16 +105,13 @@ class NightAuditService:
             select(Room).where(Room.hotel_id == hotel_id, Room.state == RoomState.OCCUPIED.value)
         )
         occupied_rooms = list(rooms.scalars())
-        next_day = (date.fromisoformat(business_date) + timedelta(days=1)).isoformat()
 
-        # 夜审快照（before）：过账/翻房前的房态分布、在住房、未结账单、房态差异
+        # 夜审快照（before）：过账前的房态分布、在住房、未结账单、房态差异
         dist_before = await self._room_state_distribution(hotel_id)
         unsettled = await self._unsettled_bills(hotel_id)
         anomalies_before = await self._occupied_without_booking(hotel_id, occupied_rooms, business_date)
-        flipped: list[str] = []
 
         cs = CashierService(self.session)
-        rs = RoomService(self.session)
         ms = MemberService(self.session)
         room_rev = 0
         room_rev_by_channel: dict[str, int] = {}
@@ -251,16 +247,11 @@ class NightAuditService:
                 ch = booking.channel or "direct"
                 room_rev_by_channel[ch] = room_rev_by_channel.get(ch, 0) + price
             room_rev += price
-
-            # 预离翻房：次日应离店 → OCCUPIED→VACANT_DIRTY（白班结账收尾款/退押金，房态已脏不重复翻）
-            if booking and booking.check_out_date == next_day:
-                try:
-                    await rs.transition(
-                        room, RoomTrigger.CHECK_OUT, operator=operator, auto_commit=False
-                    )
-                    flipped.append(room.room_no)
-                except Exception:  # noqa: BLE001 — 已被翻过则忽略
-                    pass
+            # 注意：此处**不得**再做「预离翻房」（OCCUPIED→VACANT_DIRTY）。在住房必须保持
+            # OCCUPIED 直到真实退房（由 booking_service.check_out 负责 occupied→vacant_dirty
+            # + 派清扫工单）。夜审提前翻脏会造成 rooms.state 与 bookings.status 不一致：
+            # 房态盘显示空房（可被清扫后重卖 → 重房）、在住数少算，且真实退房时因源状态非
+            # OCCUPIED 触发 InvalidTransition 而被卡死（见 TRANSITIONS[CHECK_OUT]）。
 
         other_rev = await self._other_revenue(hotel_id)
         total_n = await self._total_rooms(hotel_id)
@@ -271,7 +262,7 @@ class NightAuditService:
         # M23（验收清单#3）：NoShow 自动处理——逾期应到未到 → 标记 + 释放预分配锁房
         noshow_ids = await self._auto_noshow(tenant_id, hotel_id, business_date, operator)
 
-        # 夜审快照（after）：过账/翻房后的房态分布、过账房租、翻房明细
+        # 夜审快照（after）：过账后的房态分布、过账房租
         dist_after = await self._room_state_distribution(hotel_id)
         snapshot = {
             "before": {
@@ -283,7 +274,8 @@ class NightAuditService:
             "after": {
                 "room_state_distribution": dist_after,
                 "posted_room_charge": room_rev,
-                "flipped_rooms": flipped,
+                # 字段保留（历史日报 JSON 兼容，schema 不变）；夜审不再翻房，恒为空数组
+                "flipped_rooms": [],
             },
             "diff": {
                 "occupied_delta": len(occupied_rooms) - dist_after.get(RoomState.OCCUPIED.value, 0),

@@ -269,8 +269,14 @@ class TestM306HotelRanking:
         d = three_hotel_tenant
         code = d["code"]
         h1, rt1 = d["h1"], d["rt1"]
-        # 2 个独立房间 × 2 天，避免跨日翻房影响
+        # 2 个独立房间 × 2 天。
+        # 注意：夜审已不再「预离翻房」——在住房保持 occupied 直到**真实退房**。
+        # 因此第 2 天夜审前必须显式退掉 0101，否则它仍是在住房，会被 12-02 这天
+        # 重复计入一笔房费（旧实现靠翻房把它踢出在住集来规避，属错误设计）。
+        prev_bk_id = None
         for biz_date, room_no in [("2026-12-01", "0101"), ("2026-12-02", "0102")]:
+            if prev_bk_id is not None:
+                client.post(f"/api/v1/tenants/{code}/bookings/{prev_bk_id}/check-out", json={})
             bk = client.post(f"/api/v1/tenants/{code}/bookings", json={
                 "hotel_id": h1["id"],
                 "room_type_id": rt1["id"],
@@ -284,6 +290,7 @@ class TestM306HotelRanking:
             client.post(f"/api/v1/tenants/{code}/night-audit", json={
                 "hotel_id": h1["id"], "business_date": biz_date,
             })
+            prev_bk_id = bk["id"]
         reset_cache()
         r1 = client.get(f"/api/v1/tenants/{code}/analytics/hotel-ranking", params={
             "start_date": "2026-12-01", "end_date": "2026-12-01",

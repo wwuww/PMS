@@ -125,14 +125,15 @@ python -m venv .venv
 
 ### 夜审引擎（M4，FR-YS）
 - `app/models/night_audit.py`：BusinessDay（营业日，DEC-03 与自然日解耦）、DailyReport（不可变营业日报快照）
-- `app/services/night_audit_service.py`：`run_night_audit()` —— 取/建 OPEN 营业日 → 统计到离店 → 遍历在住房按价格库存中心解析当日房租并过账（去重防重复）→ 会员房累积积分 → 次日应离店房自动翻房（预离）→ 生成日报 → 营业日置 CLOSED → 发布 `NightAuditCompleted`
+- `app/services/night_audit_service.py`：`run_night_audit()` —— 取/建 OPEN 营业日 → 统计到离店 → 遍历在住房按价格库存中心解析当日房租并过账（去重防重复）→ 会员房累积积分 → 生成日报 → 营业日置 CLOSED → 发布 `NightAuditCompleted`
+  - **房态不变式**：夜审**只过账、不翻房**。在住房一律保持 `occupied` 直到真实退房（`booking_service.check_out` 负责 `occupied→vacant_dirty` + 派清扫工单）。历史版本曾在此做「预离翻房」（`check_out_date == business_date + 1` 即翻脏），造成 `rooms.state` 与 `bookings.status` 不一致：房态盘显示空房（清扫后可被重卖 → 重房）、在住数少算，且真实退房因源状态非 `OCCUPIED` 抛 `InvalidTransition` 被卡死。该逻辑已移除，回归见 `tests/test_night_audit.py::TestNightAudit::test_night_audit_does_not_block_real_checkout`。
 - 端点：`POST /night-audit`、`GET /business-days`、`GET /daily-reports`
 
 #### 夜审快照前后对比（操作台增强）
 - `DailyReport.snapshot`（原为恒 `"{}"` 占位）现由 `run_night_audit()` 填充 JSON，零模型变更、alembic 零漂移：
-  - **before（过账/翻房前）**：`room_state_distribution`（六态计数）、`occupied_rooms`、`unsettled_bills`（`count` + `amount`分，取 OPEN 账单 `balance` 之和）、`anomalies`（房态差异检测：在住房但无覆盖营业日的在住预订，脏数据/重复入住）。
-  - **after（过账/翻房后）**：`room_state_distribution`、`posted_room_charge`（全店过账房租）、`flipped_rooms`（预离翻房明细）。
-  - **diff**：`occupied_delta`（在住变化数）。
+  - **before（过账前）**：`room_state_distribution`（六态计数）、`occupied_rooms`、`unsettled_bills`（`count` + `amount`分，取 OPEN 账单 `balance` 之和）、`anomalies`（房态差异检测：在住房但无覆盖营业日的在住预订，脏数据/重复入住）。
+  - **after（过账后）**：`room_state_distribution`、`posted_room_charge`（全店过账房租）、`flipped_rooms`（**恒为空数组**；字段保留仅为兼容历史日报 JSON，夜审不再翻房）。
+  - **diff**：`occupied_delta`（在住变化数；夜审不翻房，正常应为 0）。
 - `DailyReportOut` 新增 `snapshot: str` 字段，前端 `每日营业报表` 表格可展开行解析并对比夜审前后房态/账务/差异提醒。
 - 前端 `NightAudit.tsx` 新增「挂账 / 异常营业日」卡片（列 `SUSPENDED` 营业日 + `suspended_reason` + 单笔「重试夜审」按钮 + 「重试全部挂账」批量按钮，复用 `_get_or_open_day` 重开 OPEN 重试）。
 - **挂账原因归因**：`NightAuditScheduler.auto_run` 捕获单日异常后置 `SUSPENDED` 时，将原因格式化为 `[分类] 原文`（如 `[重复入住脏数据]`、`[房型数据缺失]`、`[房态流转非法]`、`[数据完整性冲突]`、`[数据库/连接异常]`、`[未知异常]`）；`_categorize_suspended(exc)` 按消息关键字归类（纯函数，不依赖异常类型，新异常自动落入「未知异常」）。前端 `parseSuspended` 解析前缀 → 彩色 Tag，便于运营按原因分组干预。
@@ -154,7 +155,7 @@ python -m venv .venv
 | 验收项 | 状态 |
 |--------|------|
 | 夜审房租自动过账 + 营业日报 | ✅ 单店秒级，重复夜审 409 拦截 |
-| 预离自动翻房（OCCUPIED→VACANT_DIRTY） | ✅ |
+| 预离自动翻房（OCCUPIED→VACANT_DIRTY） | ❌ **已移除**——在住房必须保持 OCCUPIED 直到真实退房（房态不变式，见上）；改由 `booking_service.check_out` 负责翻脏 |
 | 收银开单/加账/多方式收款/结账/押金退款 | ✅ 余额校验、结账须平账 |
 | 会员注册/充值/积分累积（结账联动） | ✅ |
 

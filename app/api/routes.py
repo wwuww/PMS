@@ -1174,7 +1174,7 @@ async def booking_check_out(
     except ValueError as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
     except InvalidTransition as exc:
-        # 房间已被夜审翻房/非在住态：属业务冲突（409），不应暴露为 500
+        # 房间非在住态（换房腾退/手工房态流转等）：属业务冲突（409），不应暴露为 500
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
 
 

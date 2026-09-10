@@ -1,4 +1,9 @@
-"""夜审引擎（M4）集成测试：房租过账 / 营业日报 / 预离翻房 / 快照对比。"""
+"""夜审引擎（M4）集成测试：房租过账 / 营业日报 / 在住房房态不变式 / 快照对比。
+
+回归说明：夜审**不得**再做「预离翻房」（occupied→vacant_dirty）。在住房必须保持
+occupied 直到真实退房，否则 rooms.state 与 bookings.status 不一致，且真实退房会因
+源状态非 OCCUPIED 抛 InvalidTransition 而被卡死。
+"""
 
 import json
 
@@ -60,17 +65,26 @@ class TestNightAudit:
         bds = client.get(f"/api/v1/tenants/{t['code']}/business-days").json()
         assert bds[0]["status"] == "CLOSED"
 
-    def test_pre_departure_flip(self, client: TestClient) -> None:
+    def test_no_pre_departure_flip_keeps_room_occupied(self, client: TestClient) -> None:
+        """回归：夜审不得把「次日应离店」的在住房提前翻成空脏（房态/订单必须一致）。"""
         t, h, rt = _seed(client)
-        _check_in(client, t, rt, h, "0101", "13700000002", "2026-10-01", "2026-10-03")
+        bk = _check_in(client, t, rt, h, "0101", "13700000002", "2026-10-01", "2026-10-03")
 
-        # 夜审 2026-10-02：次日(10-03)应离店 → 自动翻房 vacant_dirty
+        # 夜审 2026-10-02：次日(10-03)应离店 —— 房间必须仍在住，不得被翻脏
         client.post(
             f"/api/v1/tenants/{t['code']}/night-audit",
             json={"hotel_id": h["id"], "business_date": "2026-10-02"},
         )
+        occupied = client.get(f"/api/v1/tenants/{t['code']}/rooms?state=occupied").json()
+        assert [r["room_no"] for r in occupied] == ["0101"]
         dirty = client.get(f"/api/v1/tenants/{t['code']}/rooms?state=vacant_dirty").json()
-        assert len(dirty) == 1
+        assert dirty == []
+        # 订单仍是在住，未随房态被改动
+        cur = next(
+            b for b in client.get(f"/api/v1/tenants/{t['code']}/bookings").json()
+            if b["id"] == bk["id"]
+        )
+        assert cur["status"] == "checked_in"
 
     def test_duplicate_audit_blocked(self, client: TestClient) -> None:
         t, h, rt = _seed(client)
@@ -102,22 +116,68 @@ class TestNightAudit:
         # 夜审后：过账房租写入快照
         assert snap["after"]["posted_room_charge"] == 30000
 
-    def test_snapshot_flip_delta(self, client: TestClient) -> None:
+    def test_snapshot_no_flip_delta(self, client: TestClient) -> None:
+        """回归：夜审不再翻房 → 在住数不跳变、flipped_rooms 恒为空数组。"""
         t, h, rt = _seed(client)
         _check_in(client, t, rt, h, "0101", "13700000012", "2026-10-01", "2026-10-03")
 
-        # 夜审 2026-10-02：次日(10-03)应离店 → 自动翻房，在住 -1
+        # 夜审 2026-10-02：次日(10-03)应离店，但房态保持不变
         rep = client.post(
             f"/api/v1/tenants/{t['code']}/night-audit",
             json={"hotel_id": h["id"], "business_date": "2026-10-02"},
         ).json()
 
         snap = json.loads(rep["snapshot"])
-        assert snap["diff"]["occupied_delta"] == 1  # 在住减少 1 间
-        assert "0101" in snap["after"]["flipped_rooms"]
-        # 翻房后该房已是空脏
-        dirty = client.get(f"/api/v1/tenants/{t['code']}/rooms?state=vacant_dirty").json()
-        assert any(r["room_no"] == "0101" for r in dirty)
+        assert snap["diff"]["occupied_delta"] == 0  # 在住数不变
+        assert snap["after"]["flipped_rooms"] == []  # 字段保留但不再有翻房
+        # 该房仍是在住
+        occupied = client.get(f"/api/v1/tenants/{t['code']}/rooms?state=occupied").json()
+        assert any(r["room_no"] == "0101" for r in occupied)
+
+    def test_night_audit_does_not_block_real_checkout(self, client: TestClient) -> None:
+        """回归（核心）：夜审后「房间仍 occupied + 订单仍 checked_in」，真实退房必须成功。
+
+        历史 bug：夜审按 check_out_date == business_date + 1 把房间翻成 vacant_dirty 却不动
+        bookings.status；随后真实退房走 CHECK_OUT 流转时源状态非 OCCUPIED →
+        InvalidTransition → 409，客人永远退不掉房，且空房可被重卖（重房）。
+        """
+        t, h, rt = _seed(client)
+        client.post(
+            f"/api/v1/hotels/{h['id']}/rooms",
+            json=[{"room_type_id": rt["id"], "room_no": "0102"}],
+        )
+        bks = [
+            _check_in(client, t, rt, h, "0101", "13700000031", "2026-10-01", "2026-10-03"),
+            _check_in(client, t, rt, h, "0102", "13700000032", "2026-10-01", "2026-10-03"),
+        ]
+        client.post(
+            f"/api/v1/tenants/{t['code']}/night-audit",
+            json={"hotel_id": h["id"], "business_date": "2026-10-02"},
+        )
+
+        # 1) 夜审后：两间房仍在住
+        occupied = {
+            r["room_no"]
+            for r in client.get(f"/api/v1/tenants/{t['code']}/rooms?state=occupied").json()
+        }
+        assert occupied == {"0101", "0102"}
+        # 2) 夜审后：两笔订单仍是 checked_in
+        listed = client.get(f"/api/v1/tenants/{t['code']}/bookings").json()
+        for bk in bks:
+            cur = next(b for b in listed if b["id"] == bk["id"])
+            assert cur["status"] == "checked_in"
+
+        # 3) 真实退房必须成功（被该 bug 卡死的路径）
+        for bk in bks:
+            resp = client.post(
+                f"/api/v1/tenants/{t['code']}/bookings/{bk['id']}/check-out", json={}
+            )
+            assert resp.status_code == 200, resp.text
+        dirty = {
+            r["room_no"]
+            for r in client.get(f"/api/v1/tenants/{t['code']}/rooms?state=vacant_dirty").json()
+        }
+        assert dirty == {"0101", "0102"}
 
     def test_snapshot_detects_occupied_without_booking(self, client: TestClient) -> None:
         t, h, rt = _seed(client)
