@@ -57,6 +57,7 @@ import { ROOM_STATE_LABELS, TRIGGER_LABELS } from "../domain/roomActions";
 import { fmtCents } from "../utils/format";
 // 必须带 .tsx 后缀：无后缀会优先解析到 format.ts（纯字符串工具），取不到组件。
 import { CellAmount } from "../utils/format.tsx";
+import DepositQuickPanel from "../components/deposit/DepositQuickPanel";
 
 const ID_TYPES = [
   { value: "ID", label: "居民身份证" },
@@ -210,6 +211,11 @@ export default function CheckInRegister() {
     [bookings, roomNo]
   );
   const isStay = room?.state === "occupied" && !!stayBooking;
+  // 押金面板绑定的登记单：在住单优先，其次预订单，再退回 URL 带入的 booking_id；散客新建时为 null
+  const depositBookingId = useMemo<number | null>(() => {
+    const id = stayBooking?.id ?? booking?.id ?? bookingId;
+    return id != null ? Number(id) : null;
+  }, [stayBooking, booking, bookingId]);
   // 在住模式：把登记单客人信息回填表单（只读展示）
   useEffect(() => {
     if (!isStay || !stayBooking) return;
@@ -767,25 +773,8 @@ export default function CheckInRegister() {
           </div>
         </div>
 
-        {/* 押金行 */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px 10px", marginTop: 8 }}>
-          <div>
-            <div style={{ marginBottom: 2 }}>本人押金</div>
-            <Input size="small" value="0" disabled />
-          </div>
-          <div>
-            <div style={{ marginBottom: 2 }}>授权金额</div>
-            <Input size="small" value="0" disabled />
-          </div>
-          <div>
-            <div style={{ marginBottom: 2 }}>币种</div>
-            <Select size="small" style={{ width: "100%" }} value="CNY" disabled options={[{ value: "CNY", label: "人民币" }]} />
-          </div>
-          <div>
-            <div style={{ marginBottom: 2 }}>金额</div>
-            <Input size="small" value="0.00" disabled />
-          </div>
-        </div>
+        {/* 押金行：接后端押金/预授权能力（M36 接线，取代原写死的四个禁用控件） */}
+        <DepositQuickPanel bookingId={depositBookingId} roomNo={roomNo || null} />
         <div style={{ display: "flex", gap: 16, marginTop: 8, flexWrap: "wrap" }}>
           {["兑点", "当日起早", "VIP客人", "信息保密", "价格保密", "匿名单"].map((t) => (
             <Checkbox key={t} disabled>
