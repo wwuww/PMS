@@ -71,6 +71,7 @@ const baseItems: MenuProps["items"] = [
       { key: "/check-in-register", icon: <IdcardOutlined />, label: "登记入住" },
       { key: "/rooms", icon: <AppstoreOutlined />, label: "房态盘" },
       { key: "/guests", icon: <IdcardOutlined />, label: "宾客档案" },
+      { key: "/breakfast", icon: <CoffeeOutlined />, label: "早餐券" },
       { key: "/complaints", icon: <CustomerServiceOutlined />, label: "投诉管理" },
       { key: "/shifts", icon: <ReconciliationOutlined />, label: "前台交班" },
     ],
@@ -115,6 +116,7 @@ const baseItems: MenuProps["items"] = [
       { key: "/adjustments", icon: <SwapOutlined />, label: "调账中心" },
       { key: "/deposits", icon: <CreditCardOutlined />, label: "押金管理" },
       { key: "/invoices", icon: <FileDoneOutlined />, label: "发票管理" },
+      { key: "/coupons", icon: <GiftOutlined />, label: "优惠券管理" },
     ],
   },
   {
@@ -263,19 +265,19 @@ function parentKey(path: string): string | undefined {
   if (
     hit(path, "/bookings") || hit(path, "/billing") || hit(path, "/reception") ||
     hit(path, "/reception-workbench") || hit(path, "/check-in-register") ||
-    hit(path, "/rooms") || hit(path, "/guests") || hit(path, "/complaints") ||
-    hit(path, "/shifts")
+    hit(path, "/rooms") || hit(path, "/guests") || hit(path, "/breakfast") ||
+    hit(path, "/complaints") || hit(path, "/shifts")
   ) return "front-desk";
   if (
     hit(path, "/housekeeping") || hit(path, "/nightaudit") ||
     hit(path, "/group-blocks") || hit(path, "/wakeup") || hit(path, "/psb")
   ) return "housekeeping-ops";
-  if (hit(path, "/pos") || hit(path, "/kds") || hit(path, "/breakfast")) return "fnb";
+  if (hit(path, "/pos") || hit(path, "/kds")) return "fnb";
   if (hit(path, "/members") || hit(path, "/ar-accounts")) return "crm";
   if (
     hit(path, "/commission") || hit(path, "/reconciliation") ||
     hit(path, "/adjustments") || hit(path, "/deposits") ||
-    hit(path, "/invoices")
+    hit(path, "/invoices") || hit(path, "/coupons")
   ) return "finance";
   if (hit(path, "/rates") || hit(path, "/rate-calendar") || hit(path, "/yield")) return "yield";
   if (hit(path, "/group") || hit(path, "/price-policy")) return "group";
