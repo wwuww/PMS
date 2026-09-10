@@ -65,6 +65,67 @@ class TestNightAudit:
         bds = client.get(f"/api/v1/tenants/{t['code']}/business-days").json()
         assert bds[0]["status"] == "CLOSED"
 
+    def test_room_charge_basis_is_booking_coverage(self, client: TestClient) -> None:
+        """过账口径 = 「订单覆盖营业日」：check_in_date <= business_date < check_out_date。
+
+        住 2026-10-01 → 10-03（2 晚）应恰好过账 2 笔房租：
+          10-01 覆盖 → 计费；10-02 覆盖 → 计费；10-03 == 离店日 → 不计费。
+        """
+        t, h, rt = _seed(client)
+        _check_in(client, t, rt, h, "0101", "13700000041", "2026-10-01", "2026-10-03")
+
+        for biz_date, expected in (
+            ("2026-10-01", 30000),  # check_in <= d < check_out → 计费
+            ("2026-10-02", 30000),  # 同上
+            ("2026-10-03", 0),      # check_out == d（当天离店）→ 当晚不计费
+        ):
+            rep = client.post(
+                f"/api/v1/tenants/{t['code']}/night-audit",
+                json={"hotel_id": h["id"], "business_date": biz_date},
+            ).json()
+            assert rep["room_revenue"] == expected, f"{biz_date} → {rep['room_revenue']}"
+
+        # 账单侧：恰好 2 笔房租，合计 60000（证明不是只改了报表数字）
+        bill = client.get(f"/api/v1/tenants/{t['code']}/bills").json()[0]
+        detail = client.get(f"/api/v1/tenants/{t['code']}/bills/{bill['id']}").json()
+        room_items = [i for i in detail["items"] if i["type"] == "ROOM_CHARGE"]
+        assert len(room_items) == 2, detail["items"]
+        assert detail["balance"] == 60000
+
+    def test_no_charge_on_departure_date_while_still_occupied(self, client: TestClient) -> None:
+        """核心回归：当天应离店但尚未办退房 → 房间仍在住，但当日**不**产生房费。
+
+        旧实现靠「预离翻房」把房间提前踢出在住集来规避多收；翻房删除后改为按订单
+        覆盖营业日判断，从口径上杜绝「多收一晚」。
+        """
+        t, h, rt = _seed(client)
+        _check_in(client, t, rt, h, "0101", "13700000042", "2026-10-01", "2026-10-02")
+
+        # 10-01 覆盖 → 计费一晚
+        rep1 = client.post(
+            f"/api/v1/tenants/{t['code']}/night-audit",
+            json={"hotel_id": h["id"], "business_date": "2026-10-01"},
+        ).json()
+        assert rep1["room_revenue"] == 30000
+
+        # 10-02 是离店日，客人尚未办退房：房间物理仍在住
+        occupied = client.get(f"/api/v1/tenants/{t['code']}/rooms?state=occupied").json()
+        assert [r["room_no"] for r in occupied] == ["0101"]
+
+        rep2 = client.post(
+            f"/api/v1/tenants/{t['code']}/night-audit",
+            json={"hotel_id": h["id"], "business_date": "2026-10-02"},
+        ).json()
+        assert rep2["occupied_rooms"] == 1  # 在住数仍按物理房态统计
+        assert rep2["room_revenue"] == 0    # 但当日房费为 0，不得多收一晚
+
+        # 账单侧：只有 10-01 那一笔
+        bill = client.get(f"/api/v1/tenants/{t['code']}/bills").json()[0]
+        detail = client.get(f"/api/v1/tenants/{t['code']}/bills/{bill['id']}").json()
+        room_items = [i for i in detail["items"] if i["type"] == "ROOM_CHARGE"]
+        assert len(room_items) == 1, detail["items"]
+        assert detail["balance"] == 30000
+
     def test_no_pre_departure_flip_keeps_room_occupied(self, client: TestClient) -> None:
         """回归：夜审不得把「次日应离店」的在住房提前翻成空脏（房态/订单必须一致）。"""
         t, h, rt = _seed(client)

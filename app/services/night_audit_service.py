@@ -5,6 +5,8 @@ run_night_audit 流程（验收：夜审≤5分钟，单店可秒级）：
 2. 统计当日到店/离店；
 3. 遍历在住房：按价格库存中心解析当日房租并过账至账单（去重防重复过账），
    会员房按房租累积积分；在住房一律保持 OCCUPIED，房态只在真实退房时流转；
+   **过账口径为「订单覆盖营业日」**：check_in_date <= business_date < check_out_date，
+   当天应离店（check_out_date == business_date）的房间当晚不再计费；
 4. 汇总杂费收入，生成不可变营业日报 DailyReport；
 5. 营业日置 CLOSED，发布 NightAuditCompleted 事件。
 """
@@ -133,17 +135,19 @@ class NightAuditService:
                 )
             ).scalars()
         )
-        # 同一房间可能残留多笔在住订单（重复入住 / 历史脏数据）。与逐房版 next(...)
-        # 语义严格一致：优先「住期覆盖营业日」的最新一笔，否则取最新一笔。
-        newest_by_room: dict[str, Booking] = {}
-        covering_by_room: dict[str, Booking] = {}
-        for b in bk_rows:
-            newest_by_room.setdefault(b.room_no, b)
-            if b.check_in_date <= business_date < b.check_out_date:
-                covering_by_room.setdefault(b.room_no, b)
+        # 过账口径（M32.19）：**只有订单覆盖营业日才计这一晚房费**
+        #   check_in_date <= business_date < check_out_date
+        # 与 _occupied_without_booking 的差异检测口径严格一致。
+        #   - check_out_date == business_date（当天应离店）→ 当晚不再计费，避免「当天应离店
+        #     但尚未办退房被多收一晚」（旧实现靠「预离翻房」把房间踢出在住集来规避，已删除）。
+        #   - 不再回退到「最新一笔在住单」：不覆盖营业日的订单（已到/已过离店日、未来抵店）
+        #     一律不过账、不计当日房费；房间仍按物理房态计入在住数与出租率。
+        # 同一房间可能残留多笔覆盖订单（重复入住脏数据）：bk_rows 按 id 倒序，
+        # setdefault 保留最新的一笔。
         booking_by_room: dict[str, Booking] = {}
-        for room_no, b in newest_by_room.items():
-            booking_by_room[room_no] = covering_by_room.get(room_no, b)
+        for b in bk_rows:
+            if b.check_in_date <= business_date < b.check_out_date:
+                booking_by_room.setdefault(b.room_no, b)
 
         # 批量解析房价：基准价（价格日历当日覆盖，否则 base_price）→ 五维 RateCode
         # 折扣（channel=direct / member=none / agreement=none，房型专属优先于通用），
@@ -223,29 +227,35 @@ class NightAuditService:
 
         for room in occupied_rooms:
             booking = booking_by_room.get(room.room_no)
+            if booking is None:
+                # 房间物理在住，但无覆盖本营业日的在住订单：当天应离店未退房 / 逾期未续住 /
+                # 无单脏房 —— 一律不过账、不计当日房费。这类房间由 before.anomalies 的
+                # occupied_without_booking 暴露给前台处理（补退房 / 续住 / 超时加收）。
+                continue
             price = price_by_rt[room.room_type_id]
-            if booking and booking.stay_type == "hourly":
+            if booking.stay_type == "hourly":
                 # M24：时租房即住即结，夜审不过账房租（避免按整晚重复计费）
                 continue
-            if booking:
-                bill = bill_map[booking.id]
-                if bill.id not in charged_ids:
-                    await cs.add_charge(
-                        bill,
-                        "ROOM_CHARGE",
-                        price,
-                        f"房租 {business_date}",
-                        operator,
-                        business_date=business_date,
-                    )
-                    charged_ids.add(bill.id)
-                    if booking.guest_phone:
-                        m = await ms.get_by_phone(tenant_id, booking.guest_phone)
-                        if m:
-                            await ms.earn_points(m, price, operator)
-                # 按渠道累计佣金性房费收入（夜审佣金对账 M4-4 基数）
-                ch = booking.channel or "direct"
-                room_rev_by_channel[ch] = room_rev_by_channel.get(ch, 0) + price
+            bill = bill_map[booking.id]
+            if bill.id not in charged_ids:
+                await cs.add_charge(
+                    bill,
+                    "ROOM_CHARGE",
+                    price,
+                    f"房租 {business_date}",
+                    operator,
+                    business_date=business_date,
+                )
+                charged_ids.add(bill.id)
+                if booking.guest_phone:
+                    m = await ms.get_by_phone(tenant_id, booking.guest_phone)
+                    if m:
+                        await ms.earn_points(m, price, operator)
+            # 按渠道累计佣金性房费收入（夜审佣金对账 M4-4 基数）
+            ch = booking.channel or "direct"
+            room_rev_by_channel[ch] = room_rev_by_channel.get(ch, 0) + price
+            # 计入当日过账房租。即使命中判重（该营业日已过账过，如挂账重试）也要计数，
+            # 因为这一晚的房费确实已存在，只是本次不重复写 BillItem。
             room_rev += price
             # 注意：此处**不得**再做「预离翻房」（OCCUPIED→VACANT_DIRTY）。在住房必须保持
             # OCCUPIED 直到真实退房（由 booking_service.check_out 负责 occupied→vacant_dirty
