@@ -39,7 +39,7 @@ export const ACTION_LABELS: Record<string, string> = {
   CAPTURE: "预授权转实收",
 };
 
-export type DepositActionType = "apply" | "refund" | "release" | "void";
+export type DepositActionType = "apply" | "refund" | "release" | "void" | "capture";
 
 /**
  * 可退状态集合：后端 refund（deposit_service.py 第 356 行）的守卫是
@@ -57,15 +57,15 @@ const REFUNDABLE_STATUSES: ReadonlySet<DepositStatus> = new Set<DepositStatus>([
 
 /**
  * 可释放状态集合：后端 release（deposit_service.py 第 476-487 行）只拒绝
- * `RELEASED` 与 `APPLIED` 两种状态；这里收敛为「非终态」——比后端更严格
- * （不释放已退款/已没收/已作废的单据），只会禁用按钮、不会放行后端会拒绝的操作。
+ * `RELEASED` 与 `APPLIED` 两种状态。这里比后端更严格：不释放已退款/已没收/已作废的单据，
+ * 且【不含 CAPTURED】——已请款的钱已经真正收取，不能再「释放」，如需退回必须走 refund。
+ * （CAPTURED 曾在本集合中，属错误：会导致已收款的预授权被放行释放。）
  * 关键：必须包含 AUTHORIZED —— 新建预授权的初态（deposit_service.py 第 137-142 行），
  * 缺失它会导致刚刷的预授权永远点不了「释放」。
  */
 const RELEASABLE_STATUSES: ReadonlySet<DepositStatus> = new Set<DepositStatus>([
   "AUTHORIZED",
   "HELD",
-  "CAPTURED",
   "PARTIALLY_APPLIED",
 ]);
 
@@ -88,6 +88,8 @@ const APPLICABLE_POOL: ReadonlySet<string> = new Set<string>([
  * - refund  可用余额 > 0 + status ∉ _TERMINAL（deposit_service.py:45-51, 356）
  * - release 仅 PREAUTH + applied==0 + status ∈ 非终态（deposit_service.py:476-487）
  * - void    仅 DEPOSIT + applied==0 + HELD + 24h 内（deposit_service.py:424-435）
+ * - capture 仅 PREAUTH + 可用余额 > 0 + status == AUTHORIZED（预授权请款：冻结额度转实收，
+ *           AUTHORIZED -> CAPTURED；已请款/已释放/实收押金均不可再请款）
  */
 export function canAct(d: Deposit, action: DepositActionType): boolean {
   const avail = d.available_cents > 0;
@@ -106,6 +108,8 @@ export function canAct(d: Deposit, action: DepositActionType): boolean {
       return isPreauth && appliedZero && RELEASABLE_STATUSES.has(d.status);
     case "void":
       return isDeposit && appliedZero && d.status === "HELD" && within24h;
+    case "capture":
+      return isPreauth && avail && d.status === "AUTHORIZED";
     default:
       return false;
   }

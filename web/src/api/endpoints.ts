@@ -114,6 +114,7 @@ import type {
   Deposit,
   DepositIn,
   DepositApplyIn,
+  DepositCaptureIn,
   DepositRefundIn,
   DepositReleaseIn,
   DepositVoidIn,
@@ -2599,6 +2600,18 @@ export async function applyDeposit(
   body: DepositApplyIn
 ): Promise<Deposit> {
   const { data } = await http.post<Deposit>(`/tenants/${tenantCode}/deposits/${depositId}/apply`, body);
+  return data;
+}
+
+export async function captureDeposit(
+  tenantCode: string,
+  depositId: string,
+  body: DepositCaptureIn
+): Promise<Deposit> {
+  const { data } = await http.post<Deposit>(
+    `/tenants/${tenantCode}/deposits/${depositId}/capture`,
+    body
+  );
   return data;
 }
 

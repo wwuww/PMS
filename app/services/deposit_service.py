@@ -483,6 +483,13 @@ class DepositService:
                 "DEPOSIT_PREAUTH_CAPTURED",
                 "已请款，余款请走 refund 而非 release",
             )
+        if d.status == DepositStatus.CAPTURED.value:
+            # 已请款 = 钱已真实入账（等同 HELD），此时「释放冻结」在语义上不成立，
+            # 只能通过 refund 退回。缺此守卫会出现「已收的钱被当作冻结额度释放掉」的资金漏洞。
+            raise DepositError(
+                "DEPOSIT_PREAUTH_CAPTURED",
+                "已请款，请走 refund 而非 release",
+            )
         if d.status in (DepositStatus.RELEASED.value, DepositStatus.APPLIED.value):
             raise DepositError("DEPOSIT_ALREADY_SETTLED", f"状态 {d.status} 不可再释放")
         if expected_version is not None and d.version != expected_version:
@@ -514,6 +521,106 @@ class DepositService:
             resource_id=str(d.id),
             hotel_id=d.hotel_id,
             detail={"amount": d.amount_cents, "ref_no": d.ref_no, "cause": cause},
+        )
+        return d
+
+    async def capture(
+        self,
+        tenant_id: str,
+        deposit_id: int,
+        *,
+        amount_cents: int | None = None,
+        operator: str = "front_desk",
+        expected_version: int | None = None,
+        actor: str | None = None,
+    ) -> Deposit:
+        """预授权请款（AUTHORIZED → CAPTURED）：把冻结额度转为实收。
+
+        语义（对齐 ``DepositStatus.CAPTURED`` 的定义「已转实收，此后等同 HELD 参与冲抵」）：
+
+        - **不**写 ``Payment``、**不**写 ``BillItem``、**不**动 ``Bill.balance``。
+          计营收是后续 :meth:`apply` 的职责（那里写 ``Payment(method="DEPOSIT")``
+          并 ``bill.balance -= amount``）。若 capture 也写 Payment 会**重复计营收**。
+        - 请款后状态为 ``CAPTURED``，命中 ``_APPLICABLE_POOL`` 中的
+          ``(PREAUTH, CAPTURED)``，:meth:`apply` 才可正常冲抵。
+
+        ``amount_cents=None`` 表示全额请款。部分请款时未被请款的部分视同放弃冻结，
+        ``amount_cents`` 收敛为实际请款额（流水 note 与审计 detail 记录放弃额度以便追溯）。
+
+        Args:
+            tenant_id: 租户 ID。
+            deposit_id: 押金（预授权）主键。
+            amount_cents: 请款金额（分）；``None`` = 全额请款。
+            operator: 操作人（流水/审计留痕）。
+            expected_version: 乐观锁期望版本；``None`` 表示不校验。
+            actor: 审计 actor，缺省回落到 ``operator``。
+
+        Returns:
+            更新后的 :class:`Deposit`（已 flush，未 commit）。
+
+        Raises:
+            DepositError: 非预授权、状态不可请款、金额越界或版本冲突。
+        """
+        d = await self.get(tenant_id, deposit_id)
+        if d.kind != DepositKind.PREAUTH.value:
+            raise DepositError("DEPOSIT_NOT_PREAUTH", "仅预授权可请款")
+        # 幂等性不做：重复请款直接拒（CAPTURED 亦落入此分支）
+        if d.status != DepositStatus.AUTHORIZED.value:
+            raise DepositError(
+                "DEPOSIT_CAPTURE_NOT_ALLOWED",
+                f"状态 {d.status} 不可请款",
+            )
+
+        authorized_cents = d.amount_cents
+        target = amount_cents if amount_cents is not None else authorized_cents
+        if target < 1 or target > authorized_cents:
+            raise DepositError(
+                "DEPOSIT_CAPTURE_EXCEEDS",
+                f"请款金额 {target} 超出授权额度 {authorized_cents}",
+            )
+        if expected_version is not None and d.version != expected_version:
+            raise DepositError(
+                "DEPOSIT_VERSION_CONFLICT",
+                f"version 不匹配：current={d.version}, expected={expected_version}",
+            )
+
+        released_cents = authorized_cents - target
+        d.captured_at = datetime.now(UTC).isoformat(timespec="seconds")
+        if released_cents > 0:
+            # 部分请款：未请款部分放弃冻结，授权额度收敛为实际请款额
+            d.amount_cents = target
+            self._recompute_available(d)
+        d.status = DepositStatus.CAPTURED.value
+        d.version = (d.version or 0) + 1
+
+        await self._write_txn(
+            d,
+            action=DepositAction.CAPTURE.value,
+            amount_cents=target,
+            method=d.method,
+            ref_no=d.ref_no,
+            bill_id=d.bill_id,
+            operator=operator,
+            note=(
+                f"authorized={authorized_cents};released_cents={released_cents}"
+                if released_cents > 0
+                else None
+            ),
+        )
+        await audit_record(
+            self.session,
+            tenant_id=tenant_id,
+            action="deposit.capture",
+            actor=actor or operator,
+            resource_type="deposit",
+            resource_id=str(d.id),
+            hotel_id=d.hotel_id,
+            detail={
+                "amount": target,
+                "authorized": authorized_cents,
+                "released_cents": released_cents,
+                "remaining": d.available_cents,
+            },
         )
         return d
 

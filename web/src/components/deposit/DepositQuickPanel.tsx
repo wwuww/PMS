@@ -3,7 +3,7 @@
 // 复用既有资产：api/endpoints 的 listDepositsByBooking / createDeposit / releaseDeposit /
 // applyDeposit / refundDeposit / voidDeposit、components/deposit/meta.ts 的标签与状态×动作矩阵、
 // DepositDetailDrawer 详情抽屉。
-// 查看 / 释放 / 冲抵 / 退款 / 作废五个动作均在本面板内完成（含金额与原因采集弹窗），
+// 查看 / 请款 / 释放 / 冲抵 / 退款 / 作废六个动作均在本面板内完成（含金额与原因采集弹窗），
 // 仅批量操作、超期清理等后台维护场景才需跳转押金管理页。
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -24,6 +24,7 @@ import {
 import type { ColumnsType } from "antd/es/table";
 import {
   applyDeposit,
+  captureDeposit,
   createDeposit,
   listDepositsByBooking,
   refundDeposit,
@@ -33,6 +34,7 @@ import {
 import type {
   Deposit,
   DepositApplyIn,
+  DepositCaptureIn,
   DepositIn,
   DepositKind,
   DepositMethod,
@@ -76,18 +78,28 @@ interface Totals {
 const LABEL_STYLE: React.CSSProperties = { marginBottom: 2, fontSize: 12, color: "#8a919c" };
 
 /** 需要二次采集（金额 / 原因）的动作，统一走一个弹窗 */
-type QuickActionKind = Extract<DepositActionType, "apply" | "refund" | "void">;
+type QuickActionKind = Extract<DepositActionType, "apply" | "refund" | "void" | "capture">;
+
+/** 走金额采集的动作（作废只采集原因） */
+const NEEDS_AMOUNT: ReadonlySet<QuickActionKind> = new Set<QuickActionKind>([
+  "apply",
+  "refund",
+  "capture",
+]);
 
 const ACT_TITLE: Record<QuickActionKind, string> = {
   apply: "冲抵押金到账单",
   refund: "押金原路退款",
   void: "作废押金单",
+  capture: "预授权请款",
 };
 
 const ACT_CONFIRM_TIP: Record<QuickActionKind, string> = {
   apply: "冲抵后押金可用余额将相应减少，账单余额同步冲减，请核对金额。",
   refund: "退款一经提交不可撤销，金额将按原支付方式退回，请核对金额。",
   void: "作废后该押金单不可再用于冲抵 / 退款，且 24 小时后不再允许作废。",
+  capture:
+    "请款后将真正收取该笔款项，不可再释放，如需退回请走退款；请款成功后方可冲抵到账单。",
 };
 
 export default function DepositQuickPanel({ bookingId, roomNo = null }: Props) {
@@ -109,7 +121,7 @@ export default function DepositQuickPanel({ bookingId, roomNo = null }: Props) {
   const [drawerId, setDrawerId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  // 冲抵 / 退款 / 作废的采集态（单个弹窗按 kind 切换展示字段）
+  // 请款 / 冲抵 / 退款 / 作废的采集态（单个弹窗按 kind 切换展示字段）
   const [actRow, setActRow] = useState<Deposit | null>(null);
   const [actKind, setActKind] = useState<QuickActionKind | null>(null);
   const [actAmount, setActAmount] = useState<number | null>(null);
@@ -207,13 +219,19 @@ export default function DepositQuickPanel({ bookingId, roomNo = null }: Props) {
 
   /**
    * 打开金额/原因采集弹窗。
-   * 金额默认值取「全额可用余额」：与押金管理页 Deposits.tsx 的 openAction 保持一致，
-   * 收银场景中「把剩下的押金一次性结掉」是绝大多数操作，只需改数、无需清空调输入框。
+   * 冲抵 / 退款：金额默认值取「全额可用余额」，与押金管理页 Deposits.tsx 的 openAction 保持一致，
+   *   收银场景中「把剩下的押金一次性结掉」是绝大多数操作，只需改数、无需清空调输入框。
+   * 请款（capture）：金额上界与默认值取「全额授权额度」而非可用余额——请款针对的是被冻结的
+   *   授权额度本身（AUTHORIZED 状态下二者通常相等），且请款的常见场景就是全额收取。
    */
   const openAct = (row: Deposit, kind: QuickActionKind) => {
     setActRow(row);
     setActKind(kind);
-    setActAmount(Number((row.available_cents / 100).toFixed(2)));
+    setActAmount(
+      Number(
+        ((kind === "capture" ? row.amount_cents : row.available_cents) / 100).toFixed(2)
+      )
+    );
     setActNote("");
     setActReason("");
   };
@@ -236,7 +254,7 @@ export default function DepositQuickPanel({ bookingId, roomNo = null }: Props) {
       return;
     }
     const row = actRow;
-    const needsAmount = actKind === "apply" || actKind === "refund";
+    const needsAmount = NEEDS_AMOUNT.has(actKind);
 
     let amountCents = 0;
     if (needsAmount) {
@@ -245,8 +263,10 @@ export default function DepositQuickPanel({ bookingId, roomNo = null }: Props) {
         message.warning("请输入大于 0 的金额");
         return;
       }
-      if (amountCents > row.available_cents) {
-        message.warning(`金额不能超过可用余额 ${(row.available_cents / 100).toFixed(2)} 元`);
+      // 冲抵 / 退款的上界是可用余额；请款的上界是授权额度（见 openAct 注释）
+      const capCents = actKind === "capture" ? row.amount_cents : row.available_cents;
+      if (amountCents > capCents) {
+        message.warning(`金额不能超过${actKind === "capture" ? "授权额度" : "可用余额"} ${(capCents / 100).toFixed(2)} 元`);
         return;
       }
     }
@@ -276,6 +296,14 @@ export default function DepositQuickPanel({ bookingId, roomNo = null }: Props) {
         };
         await refundDeposit(tenantCode, row.id, body);
         message.success(`已退款 ${row.deposit_no}`);
+      } else if (actKind === "capture") {
+        const body: DepositCaptureIn = {
+          amount: amountCents,
+          operator: currentOperator(),
+          expected_version: row.version,
+        };
+        await captureDeposit(tenantCode, row.id, body);
+        message.success(`已请款 ${row.deposit_no}`);
       } else {
         const body: DepositVoidIn = {
           operator: currentOperator(),
@@ -347,7 +375,7 @@ export default function DepositQuickPanel({ bookingId, roomNo = null }: Props) {
     {
       title: "操作",
       key: "action",
-      width: 276,
+      width: 332,
       fixed: "right",
       render: (_: unknown, r: Deposit) => (
         <Space size={4}>
@@ -359,6 +387,13 @@ export default function DepositQuickPanel({ bookingId, roomNo = null }: Props) {
             }}
           >
             查看
+          </Button>
+          <Button
+            size="small"
+            disabled={!canManage || !canAct(r, "capture")}
+            onClick={() => openAct(r, "capture")}
+          >
+            请款
           </Button>
           <Button
             size="small"
@@ -523,12 +558,12 @@ export default function DepositQuickPanel({ bookingId, roomNo = null }: Props) {
           dataSource={rows}
           columns={columns}
           pagination={false}
-          scroll={{ x: 990 }}
+          scroll={{ x: 1046 }}
           locale={{ emptyText: "该登记单暂无押金 / 预授权记录" }}
         />
       )}
 
-      {/* 冲抵 / 退款 / 作废 采集弹窗（相当于二次确认，提交前需核对金额与原因） */}
+      {/* 请款 / 冲抵 / 退款 / 作废 采集弹窗（相当于二次确认，提交前需核对金额与原因） */}
       <Modal
         title={actKind ? ACT_TITLE[actKind] : ""}
         open={!!actKind && !!actRow}
@@ -540,11 +575,19 @@ export default function DepositQuickPanel({ bookingId, roomNo = null }: Props) {
         okButtonProps={{ loading: actSubmitting, danger: actKind === "void" }}
         cancelButtonProps={{ disabled: actSubmitting }}
       >
-        {actRow && (
+        {actRow && (actKind === "apply" || actKind === "refund") && (
           <div style={{ marginBottom: 10, fontSize: 13, color: "#5a626c" }}>
             押金单号：<strong>{actRow.deposit_no}</strong> · 可用余额：
             <Typography.Text strong>
               <CellAmount value={actRow.available_cents} />
+            </Typography.Text>
+          </div>
+        )}
+        {actRow && actKind === "capture" && (
+          <div style={{ marginBottom: 10, fontSize: 13, color: "#5a626c" }}>
+            押金单号：<strong>{actRow.deposit_no}</strong> · 授权额度：
+            <Typography.Text strong>
+              <CellAmount value={actRow.amount_cents} />
             </Typography.Text>
           </div>
         )}
@@ -561,6 +604,26 @@ export default function DepositQuickPanel({ bookingId, roomNo = null }: Props) {
             addonBefore="¥"
             min={0.01}
             max={actRow ? Number((actRow.available_cents / 100).toFixed(2)) : undefined}
+            precision={2}
+            placeholder="0.00"
+            value={actAmount}
+            disabled={actSubmitting}
+            onChange={(v) => setActAmount(v)}
+            onPressEnter={submitAct}
+          />
+        )}
+        {actRow && actKind === "capture" && (
+          <div style={{ marginBottom: 4, fontSize: 12, color: "#8a919c" }}>
+            请款金额（元，默认全额授权额度）
+          </div>
+        )}
+        {actRow && actKind === "capture" && (
+          <InputNumber
+            size="small"
+            style={{ width: "100%" }}
+            addonBefore="¥"
+            min={0.01}
+            max={Number((actRow.amount_cents / 100).toFixed(2))}
             precision={2}
             placeholder="0.00"
             value={actAmount}

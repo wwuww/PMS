@@ -20,6 +20,7 @@ import type { ColumnsType } from "antd/es/table";
 import {
   applyDeposit,
   autoReleaseDeposits,
+  captureDeposit,
   listDeposits,
   refundDeposit,
   releaseDeposit,
@@ -55,7 +56,7 @@ const KIND_OPTIONS = [
   ...Object.entries(KIND_LABELS).map(([k, v]) => ({ value: k, label: v })),
 ];
 
-type ActionKind = "apply" | "refund" | "void";
+type ActionKind = "apply" | "refund" | "void" | "capture";
 
 export default function Deposits() {
   const { tenantCode, hotelId } = useTenant();
@@ -126,6 +127,11 @@ export default function Deposits() {
       actionForm.setFieldsValue({
         amount: Number((row.available_cents / 100).toFixed(2)),
       });
+    } else if (kind === "capture") {
+      // 请款针对冻结的授权额度本身，默认与上界均为全额授权额度（请款后即可冲抵）
+      actionForm.setFieldsValue({
+        amount: Number((row.amount_cents / 100).toFixed(2)),
+      });
     } else if (kind === "void") {
       actionForm.setFieldsValue({ reason: "" });
     }
@@ -147,6 +153,13 @@ export default function Deposits() {
           expected_version: actionRow.version,
         });
         message.success("冲抵成功");
+      } else if (actionKind === "capture") {
+        await captureDeposit(tenantCode, actionRow.id, {
+          amount: yuanToCents(vals.amount),
+          operator: currentOperator(),
+          expected_version: actionRow.version,
+        });
+        message.success("请款成功");
       } else if (actionKind === "refund") {
         await refundDeposit(tenantCode, actionRow.id, {
           amount: yuanToCents(vals.amount),
@@ -263,13 +276,14 @@ export default function Deposits() {
     },
     {
       title: "操作",
-      width: 280,
+      width: 336,
       fixed: "right",
       render: (_, r) => {
         const cApply = canAct(r, "apply");
         const cRefund = canAct(r, "refund");
         const cRelease = canAct(r, "release");
         const cVoid = canAct(r, "void");
+        const cCapture = canAct(r, "capture");
         return (
           <Space size={4} wrap>
             <Button
@@ -280,6 +294,13 @@ export default function Deposits() {
               }}
             >
               查看
+            </Button>
+            <Button
+              size="small"
+              disabled={!canManage || !cCapture}
+              onClick={() => openAction(r, "capture")}
+            >
+              请款
             </Button>
             <Button
               size="small"
@@ -379,7 +400,7 @@ export default function Deposits() {
         loading={loading}
         dataSource={data}
         columns={columns}
-        scroll={{ x: 1400 }}
+        scroll={{ x: 1456 }}
         pagination={false}
         size="small"
         locale={{ emptyText: <Empty description="暂无押金记录" /> }}
@@ -393,7 +414,7 @@ export default function Deposits() {
         onClose={() => setDrawerOpen(false)}
       />
 
-      {/* 冲抵 / 退款 / 作废 通用弹窗 */}
+      {/* 请款 / 冲抵 / 退款 / 作废 通用弹窗 */}
       <Modal
         title={
           actionKind === "apply"
@@ -402,6 +423,8 @@ export default function Deposits() {
             ? "原路退款"
             : actionKind === "void"
             ? "作废押金"
+            : actionKind === "capture"
+            ? "预授权请款"
             : ""
         }
         open={!!actionKind}
@@ -411,10 +434,19 @@ export default function Deposits() {
         cancelText="取消"
         destroyOnClose
       >
-        {actionRow && (
+        {actionRow && actionKind !== "capture" && (
           <div style={{ marginBottom: 12, color: "#666" }}>
             押金单号：<strong>{actionRow.deposit_no}</strong> · 可用余额：
             <strong>{fmtCents(actionRow.available_cents)}</strong>
+          </div>
+        )}
+        {actionRow && actionKind === "capture" && (
+          <div style={{ marginBottom: 12, color: "#666" }}>
+            押金单号：<strong>{actionRow.deposit_no}</strong> · 授权额度：
+            <strong>{fmtCents(actionRow.amount_cents)}</strong>
+            <div style={{ marginTop: 4, fontSize: 12, color: "#8a919c" }}>
+              请款后将真正收取该笔款项，不可再释放，如需退回请走退款；请款成功后方可冲抵到账单。
+            </div>
           </div>
         )}
         <Form form={actionForm} layout="vertical" preserve={false}>
@@ -430,6 +462,26 @@ export default function Deposits() {
               <InputNumber
                 addonBefore="¥"
                 min={0.01}
+                precision={2}
+                style={{ width: "100%" }}
+              />
+            </Form.Item>
+          )}
+          {actionKind === "capture" && (
+            <Form.Item
+              name="amount"
+              label="请款金额（元，默认全额授权额度）"
+              rules={[
+                { required: true, message: "请输入金额" },
+                { type: "number", min: 0.01, message: "金额必须大于 0" },
+              ]}
+            >
+              <InputNumber
+                addonBefore="¥"
+                min={0.01}
+                max={
+                  actionRow ? Number((actionRow.amount_cents / 100).toFixed(2)) : undefined
+                }
                 precision={2}
                 style={{ width: "100%" }}
               />
@@ -465,7 +517,7 @@ export default function Deposits() {
         <Form form={autoForm} layout="vertical" initialValues={{ days: 30 }} preserve={false}>
           <Form.Item
             name="days"
-            label="超过天数（创建 ≥ 该天数 的 AUTHORIZED/CAPTURED 预授权将被释放）"
+            label="超过天数（创建 ≥ 该天数、且仍处于 AUTHORIZED 的预授权将被释放；已请款 CAPTURED 的不在此列，须走退款）"
             rules={[
               { required: true, type: "number", min: 1, max: 365, message: "请输入 1-365 之间的天数" },
             ]}

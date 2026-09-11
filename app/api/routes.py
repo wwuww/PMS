@@ -179,6 +179,7 @@ from app.api.schemas import (
     DepositRefundIn,
     DepositVoidIn,
     DepositReleaseIn,
+    DepositCaptureIn,
     DepositTransactionOut,
     AutoReleaseIn,
     AutoReleaseOut,
@@ -5321,6 +5322,38 @@ async def deposit_release(
             deposit_id=deposit_id,
             operator=body.operator,
             cause=body.cause,
+            expected_version=body.expected_version,
+        )
+    except DepositError as exc:
+        raise _to_deposit_http_error(exc)
+    await session.commit()
+    await session.refresh(d)
+    return _deposit_to_out(d)
+
+
+@router.post(
+    "/tenants/{tenant_id}/deposits/{deposit_id}/capture",
+    response_model=DepositOut,
+    dependencies=[Security(require_perm, scopes=[DEPOSIT_MANAGE])],
+)
+async def deposit_capture(
+    tenant_id: str,
+    deposit_id: int,
+    body: DepositCaptureIn,
+    session: AsyncSession = Depends(get_session),
+) -> DepositOut:
+    """预授权请款（AUTHORIZED → CAPTURED）。仅转实收额度，**不**写 Payment / 不动 Bill.balance。
+
+    请款后该笔预授权等同 HELD，可再调 ``/apply`` 冲抵账单（那一步才计营收）。
+    ``amount`` 缺省表示全额请款；部分请款时未请款部分放弃冻结。
+    """
+    svc = DepositService(session)
+    try:
+        d = await svc.capture(
+            tenant_id=tenant_id,
+            deposit_id=deposit_id,
+            amount_cents=body.amount,
+            operator=body.operator,
             expected_version=body.expected_version,
         )
     except DepositError as exc:

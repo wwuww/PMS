@@ -1660,6 +1660,17 @@ export interface DepositApplyIn {
   expected_version?: number;
 }
 
+/**
+ * 预授权请款（capture）入参。
+ * 语义：把已冻结的预授权额度真正收取下来，AUTHORIZED -> CAPTURED，此后才可冲抵到账单。
+ * amount 单位为【分】，省略或传 null 表示按授权额度全额请款。
+ */
+export interface DepositCaptureIn {
+  amount?: number | null;
+  operator?: string;
+  expected_version?: number;
+}
+
 export interface DepositRefundIn {
   amount: number;
   operator?: string;

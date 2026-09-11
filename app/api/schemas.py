@@ -2294,6 +2294,14 @@ class DepositReleaseIn(BaseModel):
     expected_version: int | None = None
 
 
+class DepositCaptureIn(BaseModel):
+    """预授权请款入参。``amount=None`` 表示全额请款（按授权额度）。"""
+
+    amount: int | None = Field(default=None, ge=1, description="请款金额（分）；缺省=全额请款")
+    operator: str = "front_desk"
+    expected_version: int | None = None
+
+
 class DepositTransactionOut(BaseModel):
     id: int
     action: str
