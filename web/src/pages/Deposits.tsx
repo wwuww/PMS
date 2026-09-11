@@ -465,7 +465,7 @@ export default function Deposits() {
         <Form form={autoForm} layout="vertical" initialValues={{ days: 30 }} preserve={false}>
           <Form.Item
             name="days"
-            label="超过天数（创建 ≥ 该天数 的 HELD/PARTIALLY_APPLIED 预授权将被释放）"
+            label="超过天数（创建 ≥ 该天数 的 AUTHORIZED/CAPTURED 预授权将被释放）"
             rules={[
               { required: true, type: "number", min: 1, max: 365, message: "请输入 1-365 之间的天数" },
             ]}

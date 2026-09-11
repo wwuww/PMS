@@ -5201,19 +5201,23 @@ async def deposit_list(
     hotel_id: int | None = None,
     booking_id: int | None = None,
     room_no: str | None = None,
-    status_filter: str | None = None,
+    status: str | None = None,
     kind: str | None = None,
     limit: int = 50,
     session: AsyncSession = Depends(get_session),
 ) -> list[DepositOut]:
-    """列表。limit 默认 50、上限 200（service 内部限）。"""
+    """列表。limit 默认 50、上限 200（service 内部限）。
+
+    查询参数名 ``status`` 与其余列表端点（订单/账单/预授权等）保持一致；
+    前端 ``listDeposits()`` 亦以 ``params.status`` 传参，改名会静默失效。
+    """
     svc = DepositService(session)
     rows = await svc.list(
         tenant_id=tenant_id,
         hotel_id=hotel_id,
         booking_id=booking_id,
         room_no=room_no,
-        status=status_filter,
+        status=status,
         kind=kind,
         limit=limit,
     )

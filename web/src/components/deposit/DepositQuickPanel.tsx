@@ -1,8 +1,10 @@
 // 入住登记页「押金 / 预授权」快捷面板（M36 接线）：
 // 替换 CheckInRegister 原先写死的四个禁用控件，接后端已上线的押金能力。
-// 复用既有资产：api/endpoints 的 listDepositsByBooking / createDeposit / releaseDeposit、
-// components/deposit/meta.ts 的标签与状态×动作矩阵、DepositDetailDrawer 详情抽屉。
-// 复杂动作（冲抵 / 退款 / 作废）不在本面板重复实现，统一跳转押金管理页。
+// 复用既有资产：api/endpoints 的 listDepositsByBooking / createDeposit / releaseDeposit /
+// applyDeposit / refundDeposit / voidDeposit、components/deposit/meta.ts 的标签与状态×动作矩阵、
+// DepositDetailDrawer 详情抽屉。
+// 查看 / 释放 / 冲抵 / 退款 / 作废五个动作均在本面板内完成（含金额与原因采集弹窗），
+// 仅批量操作、超期清理等后台维护场景才需跳转押金管理页。
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -10,6 +12,7 @@ import {
   Button,
   InputNumber,
   Input,
+  Modal,
   Popconfirm,
   Radio,
   Select,
@@ -19,14 +22,30 @@ import {
   Typography,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { createDeposit, listDepositsByBooking, releaseDeposit } from "../../api/endpoints";
-import type { Deposit, DepositIn, DepositKind, DepositMethod } from "../../api/types";
+import {
+  applyDeposit,
+  createDeposit,
+  listDepositsByBooking,
+  refundDeposit,
+  releaseDeposit,
+  voidDeposit,
+} from "../../api/endpoints";
+import type {
+  Deposit,
+  DepositApplyIn,
+  DepositIn,
+  DepositKind,
+  DepositMethod,
+  DepositRefundIn,
+  DepositVoidIn,
+} from "../../api/types";
 import { useTenant } from "../../store/tenant";
 import { yuanToCents } from "../../utils/format";
 // 必须带 .tsx 后缀：无后缀会优先解析到 format.ts（纯字符串工具），取不到组件。
 import { CellAmount } from "../../utils/format.tsx";
 import { currentOperator, useCan } from "../../utils/permission";
 import DepositDetailDrawer from "./DepositDetailDrawer";
+import type { DepositActionType } from "./meta";
 import { KIND_LABELS, METHOD_LABELS, STATUS_META, canAct } from "./meta";
 
 interface Props {
@@ -56,6 +75,21 @@ interface Totals {
 
 const LABEL_STYLE: React.CSSProperties = { marginBottom: 2, fontSize: 12, color: "#8a919c" };
 
+/** 需要二次采集（金额 / 原因）的动作，统一走一个弹窗 */
+type QuickActionKind = Extract<DepositActionType, "apply" | "refund" | "void">;
+
+const ACT_TITLE: Record<QuickActionKind, string> = {
+  apply: "冲抵押金到账单",
+  refund: "押金原路退款",
+  void: "作废押金单",
+};
+
+const ACT_CONFIRM_TIP: Record<QuickActionKind, string> = {
+  apply: "冲抵后押金可用余额将相应减少，账单余额同步冲减，请核对金额。",
+  refund: "退款一经提交不可撤销，金额将按原支付方式退回，请核对金额。",
+  void: "作废后该押金单不可再用于冲抵 / 退款，且 24 小时后不再允许作废。",
+};
+
 export default function DepositQuickPanel({ bookingId, roomNo = null }: Props) {
   const { tenantCode, hotelId } = useTenant();
   const { message } = App.useApp();
@@ -74,6 +108,14 @@ export default function DepositQuickPanel({ bookingId, roomNo = null }: Props) {
 
   const [drawerId, setDrawerId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // 冲抵 / 退款 / 作废的采集态（单个弹窗按 kind 切换展示字段）
+  const [actRow, setActRow] = useState<Deposit | null>(null);
+  const [actKind, setActKind] = useState<QuickActionKind | null>(null);
+  const [actAmount, setActAmount] = useState<number | null>(null);
+  const [actNote, setActNote] = useState<string>("");
+  const [actReason, setActReason] = useState<string>("");
+  const [actSubmitting, setActSubmitting] = useState(false);
 
   const fetchRows = useCallback(async () => {
     if (!bookingId || !canManage) {
@@ -163,6 +205,97 @@ export default function DepositQuickPanel({ bookingId, roomNo = null }: Props) {
     }
   };
 
+  /**
+   * 打开金额/原因采集弹窗。
+   * 金额默认值取「全额可用余额」：与押金管理页 Deposits.tsx 的 openAction 保持一致，
+   * 收银场景中「把剩下的押金一次性结掉」是绝大多数操作，只需改数、无需清空调输入框。
+   */
+  const openAct = (row: Deposit, kind: QuickActionKind) => {
+    setActRow(row);
+    setActKind(kind);
+    setActAmount(Number((row.available_cents / 100).toFixed(2)));
+    setActNote("");
+    setActReason("");
+  };
+
+  const closeAct = () => {
+    setActKind(null);
+    setActRow(null);
+    setActAmount(null);
+    setActNote("");
+    setActReason("");
+  };
+
+  /** 提交冲抵 / 退款 / 作废；错误与刷新处理严格沿用 doRelease 的模式 */
+  const submitAct = async () => {
+    if (!actRow || !actKind) return;
+    if (!canAct(actRow, actKind)) {
+      message.warning("该押金单当前状态不允许此操作，请刷新后重试");
+      closeAct();
+      await fetchRows();
+      return;
+    }
+    const row = actRow;
+    const needsAmount = actKind === "apply" || actKind === "refund";
+
+    let amountCents = 0;
+    if (needsAmount) {
+      amountCents = actAmount == null ? 0 : yuanToCents(actAmount);
+      if (amountCents < 1) {
+        message.warning("请输入大于 0 的金额");
+        return;
+      }
+      if (amountCents > row.available_cents) {
+        message.warning(`金额不能超过可用余额 ${(row.available_cents / 100).toFixed(2)} 元`);
+        return;
+      }
+    }
+    // 退款必须留痕：后端 DepositService.refund 强校验 note，缺值会返回 DEPOSIT_REASON_REQUIRED
+    if (actKind === "refund" && !actNote.trim()) {
+      message.warning("请填写退款原因（退款为资金动作，强制审计留痕）");
+      return;
+    }
+
+    setActSubmitting(true);
+    try {
+      if (actKind === "apply") {
+        const body: DepositApplyIn = {
+          amount: amountCents,
+          target_bill_id: null,
+          operator: currentOperator(),
+          expected_version: row.version,
+        };
+        await applyDeposit(tenantCode, row.id, body);
+        message.success(`已冲抵押金 ${row.deposit_no}`);
+      } else if (actKind === "refund") {
+        const body: DepositRefundIn = {
+          amount: amountCents,
+          operator: currentOperator(),
+          note: actNote.trim(),
+          expected_version: row.version,
+        };
+        await refundDeposit(tenantCode, row.id, body);
+        message.success(`已退款 ${row.deposit_no}`);
+      } else {
+        const body: DepositVoidIn = {
+          operator: currentOperator(),
+          reason: actReason.trim() || null,
+          expected_version: row.version,
+        };
+        await voidDeposit(tenantCode, row.id, body);
+        message.success(`已作废押金单 ${row.deposit_no}`);
+      }
+      closeAct();
+      await fetchRows();
+    } catch (e: unknown) {
+      const msg = (e as Error).message || "操作失败";
+      message.error(/version|冲突|已被/.test(msg) ? "数据已被修改，请刷新重试" : msg);
+      await fetchRows();
+    } finally {
+      setActSubmitting(false);
+    }
+  };
+
   const columns: ColumnsType<Deposit> = [
     { title: "押金单号", dataIndex: "deposit_no", width: 150 },
     {
@@ -214,7 +347,7 @@ export default function DepositQuickPanel({ bookingId, roomNo = null }: Props) {
     {
       title: "操作",
       key: "action",
-      width: 128,
+      width: 276,
       fixed: "right",
       render: (_: unknown, r: Deposit) => (
         <Space size={4}>
@@ -227,6 +360,20 @@ export default function DepositQuickPanel({ bookingId, roomNo = null }: Props) {
           >
             查看
           </Button>
+          <Button
+            size="small"
+            disabled={!canManage || !canAct(r, "apply")}
+            onClick={() => openAct(r, "apply")}
+          >
+            冲抵
+          </Button>
+          <Button
+            size="small"
+            disabled={!canManage || !canAct(r, "refund")}
+            onClick={() => openAct(r, "refund")}
+          >
+            退款
+          </Button>
           <Popconfirm
             title={`确认释放预授权 ${r.deposit_no}？`}
             okText="释放"
@@ -238,6 +385,14 @@ export default function DepositQuickPanel({ bookingId, roomNo = null }: Props) {
               释放
             </Button>
           </Popconfirm>
+          <Button
+            size="small"
+            danger
+            disabled={!canManage || !canAct(r, "void")}
+            onClick={() => openAct(r, "void")}
+          >
+            作废
+          </Button>
         </Space>
       ),
     },
@@ -368,10 +523,81 @@ export default function DepositQuickPanel({ bookingId, roomNo = null }: Props) {
           dataSource={rows}
           columns={columns}
           pagination={false}
-          scroll={{ x: 840 }}
+          scroll={{ x: 990 }}
           locale={{ emptyText: "该登记单暂无押金 / 预授权记录" }}
         />
       )}
+
+      {/* 冲抵 / 退款 / 作废 采集弹窗（相当于二次确认，提交前需核对金额与原因） */}
+      <Modal
+        title={actKind ? ACT_TITLE[actKind] : ""}
+        open={!!actKind && !!actRow}
+        onOk={submitAct}
+        onCancel={closeAct}
+        okText={actKind === "void" ? "确认作废" : "提交"}
+        cancelText="取消"
+        maskClosable={!actSubmitting}
+        okButtonProps={{ loading: actSubmitting, danger: actKind === "void" }}
+        cancelButtonProps={{ disabled: actSubmitting }}
+      >
+        {actRow && (
+          <div style={{ marginBottom: 10, fontSize: 13, color: "#5a626c" }}>
+            押金单号：<strong>{actRow.deposit_no}</strong> · 可用余额：
+            <Typography.Text strong>
+              <CellAmount value={actRow.available_cents} />
+            </Typography.Text>
+          </div>
+        )}
+        <div style={{ marginBottom: 12, fontSize: 12.5, color: "#8a919c" }}>
+          {actKind ? ACT_CONFIRM_TIP[actKind] : null}
+        </div>
+        {(actKind === "apply" || actKind === "refund") && (
+          <div style={{ marginBottom: 4, fontSize: 12, color: "#8a919c" }}>金额（元）</div>
+        )}
+        {(actKind === "apply" || actKind === "refund") && (
+          <InputNumber
+            size="small"
+            style={{ width: "100%" }}
+            addonBefore="¥"
+            min={0.01}
+            max={actRow ? Number((actRow.available_cents / 100).toFixed(2)) : undefined}
+            precision={2}
+            placeholder="0.00"
+            value={actAmount}
+            disabled={actSubmitting}
+            onChange={(v) => setActAmount(v)}
+            onPressEnter={submitAct}
+          />
+        )}
+        {actKind === "refund" && (
+          <>
+            <div style={{ margin: "10px 0 4px", fontSize: 12, color: "#8a919c" }}>
+              退款原因（必填，写入审计流水）
+            </div>
+            <Input.TextArea
+              rows={3}
+              maxLength={255}
+              placeholder="如：客人提前离店，押金原路退回"
+              value={actNote}
+              disabled={actSubmitting}
+              onChange={(e) => setActNote(e.target.value)}
+            />
+          </>
+        )}
+        {actKind === "void" && (
+          <>
+            <div style={{ marginBottom: 4, fontSize: 12, color: "#8a919c" }}>作废原因（可选）</div>
+            <Input.TextArea
+              rows={3}
+              maxLength={255}
+              placeholder="如：录入金额有误，重新开押"
+              value={actReason}
+              disabled={actSubmitting}
+              onChange={(e) => setActReason(e.target.value)}
+            />
+          </>
+        )}
+      </Modal>
 
       <DepositDetailDrawer
         open={drawerOpen}

@@ -1583,16 +1583,18 @@ export interface Complaint {
 
 export type DepositKind = "DEPOSIT" | "PREAUTH";
 export type DepositMethod = "CASH" | "WECHAT" | "ALIPAY" | "UNIONPAY" | "STORE_VALUE";
+// 必须与后端 app/models/deposit.py::DepositStatus 严格一致（9 个值）。
+// 注意：EXPIRED 属于 ReleaseCause（释放原因），不是押金状态；后端也不存在 PARTIALLY_REFUNDED。
 export type DepositStatus =
   | "HELD"
-  | "APPLIED"
   | "PARTIALLY_APPLIED"
+  | "APPLIED"
   | "REFUNDED"
-  | "PARTIALLY_REFUNDED"
-  | "RELEASED"
-  | "VOID"
   | "FORFEITED"
-  | "EXPIRED";
+  | "VOID"
+  | "AUTHORIZED"
+  | "CAPTURED"
+  | "RELEASED";
 export type ReleaseCause = "MANUAL" | "SETTLED" | "EXPIRED";
 
 export interface DepositTransaction {
