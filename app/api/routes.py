@@ -2481,6 +2481,20 @@ async def list_user_roles(
     return await svc.list_user_roles(tenant_id, user_id)
 
 
+# 进程内「已同步默认角色」的租户缓存：每个进程生命周期内对每个租户只真正对账一次，
+# 部署/重启后自然重新对账——存量租户因此能拿到 DEFAULT_ROLES 新增的权限点，
+# 而无需手工跑回填脚本（M37 实测漂移的根治）。
+_DEFAULT_ROLE_SYNCED: set[str] = set()
+
+
+async def _ensure_default_roles_synced(tenant_id: str, session: AsyncSession) -> None:
+    """登录成功后惰性同步默认角色定义（幂等、只增不减、不碰自定义角色）。"""
+    if tenant_id in _DEFAULT_ROLE_SYNCED:
+        return
+    await RbacService(session).sync_default_roles(tenant_id)
+    _DEFAULT_ROLE_SYNCED.add(tenant_id)
+
+
 @router.post("/tenants/{tenant_id}/auth/login", response_model=LoginOut)
 async def login(
     tenant_id: str, body: LoginIn, session: AsyncSession = Depends(get_session)
@@ -2525,6 +2539,8 @@ async def login(
         return LoginOut(token=None, username=body.username, display_name="", status=status_, permissions=[])
 
     # 成功：建会话 + 签发刷新令牌（M18-2）
+    # 先对账默认角色（幂等），保证本次返回的 permissions 已包含 DEFAULT_ROLES 新增点
+    await _ensure_default_roles_synced(tenant_id, session)
     sess = await svc.create_session(user, body.ip)
     rt = await svc.create_refresh_token(user)
     perms = await svc.effective_permissions(user)

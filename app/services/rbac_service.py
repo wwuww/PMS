@@ -161,6 +161,43 @@ class RbacService:
         await self.session.flush()
         return roles
 
+    # ----- 同步默认角色到存量租户（登录时惰性调用） -----
+    async def sync_default_roles(self, tenant_id: str) -> None:
+        """把 DEFAULT_ROLES 的最新定义对账到本租户的既有角色（幂等，只增不减）。
+
+        与 seed_default_roles 的区别：seed 只在租户开通时执行，且对已存在角色直接跳过，
+        导致后续加入 DEFAULT_ROLES 的新权限点永远到不了存量租户（M37 实测漂移：
+        admin 只有 14 个权限、缺 invoice/coupon/breakfast/blacklist 四个新点）。
+        本方法补齐：
+          - 缺失的默认角色 → 按当前定义创建
+          - 已存在且 is_system=True 的角色 → permissions 取并集（只增不减，
+            不回收任何既有权限，避免运行时突然缩权）
+          - is_system=False 自定义角色 → 绝不触碰（安全红线，禁止自动扩权）
+        """
+        for name, level, hotel_scoped, perms in DEFAULT_ROLES:
+            res = await self.session.execute(
+                select(Role).where(Role.tenant_id == tenant_id, Role.name == name)
+            )
+            role = res.scalar_one_or_none()
+            if role is None:
+                self.session.add(
+                    Role(
+                        tenant_id=tenant_id,
+                        name=name,
+                        level=level,
+                        is_system=True,
+                        hotel_scoped=hotel_scoped,
+                        permissions=list(perms),
+                    )
+                )
+                continue
+            if not role.is_system:
+                continue
+            merged = list(dict.fromkeys([*(role.permissions or []), *perms]))
+            if merged != (role.permissions or []):
+                role.permissions = merged
+        await self.session.flush()
+
     # ----- 用户 -----
     async def create_user(
         self,

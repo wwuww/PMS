@@ -1,7 +1,7 @@
 // 押金管理主页面（M32.18 T05）：
 // 列表（筛选 + 分页上限）+ 新建 + 详情抽屉 + 行内动作（冲抵/退款/释放/作废）+ 超期预授权批量释放。
 // 权限门控：useCan(PERM.DEPOSIT_MANAGE/PERM.DEPOSIT_REFUND/PERM.NIGHT_AUDIT_RUN) 与 meta.canAct 双重叠加。
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Button,
   Empty,
@@ -122,20 +122,25 @@ export default function Deposits() {
   const openAction = (row: Deposit, kind: ActionKind) => {
     setActionRow(row);
     setActionKind(kind);
-    actionForm.resetFields();
-    if (kind === "apply" || kind === "refund") {
-      actionForm.setFieldsValue({
-        amount: Number((row.available_cents / 100).toFixed(2)),
-      });
-    } else if (kind === "capture") {
-      // 请款针对冻结的授权额度本身，默认与上界均为全额授权额度（请款后即可冲抵）
-      actionForm.setFieldsValue({
-        amount: Number((row.amount_cents / 100).toFixed(2)),
-      });
-    } else if (kind === "void") {
-      actionForm.setFieldsValue({ reason: "" });
-    }
   };
+
+  // ⚠️ 默认值走 initialValues（配合下方 Form 的 key 强制重挂载），不要用 setFieldsValue。
+  // 原因：rc-dialog（antd Modal）是在它自己的 effect 里才把弹窗内容挂上去的，比本组件的
+  // effect 更晚。所以「open 变 true 之后」的任何 setFieldsValue 都仍然早于 Form 挂载，
+  // rc-field-form 会静默丢弃（不报错，只表现为「弹窗打开但金额为空」）。
+  // initialValues 在 Form 挂载时由 rc-field-form 自己读取，与调用时机无关，最稳。
+  const actionInitial = useMemo(() => {
+    if (!actionRow || !actionKind) return {};
+    if (actionKind === "apply" || actionKind === "refund") {
+      return { amount: Number((actionRow.available_cents / 100).toFixed(2)) };
+    }
+    if (actionKind === "capture") {
+      // 请款针对冻结的授权额度本身，默认与上界均为全额授权额度（请款后即可冲抵）
+      return { amount: Number((actionRow.amount_cents / 100).toFixed(2)) };
+    }
+    if (actionKind === "void") return { reason: "" };
+    return {};
+  }, [actionRow, actionKind]);
   const closeAction = () => {
     setActionRow(null);
     setActionKind(null);
@@ -449,7 +454,14 @@ export default function Deposits() {
             </div>
           </div>
         )}
-        <Form form={actionForm} layout="vertical" preserve={false}>
+        <Form
+          form={actionForm}
+          layout="vertical"
+          preserve={false}
+          initialValues={actionInitial}
+          // key 变化即强制重挂载，确保 initialValues 在每次打开弹窗时重新生效
+          key={`${actionRow?.id ?? ""}:${actionKind ?? ""}`}
+        >
           {(actionKind === "apply" || actionKind === "refund") && (
             <Form.Item
               name="amount"
