@@ -154,7 +154,7 @@ export default function NotificationsPage() {
         unreadOnly,
         refType,
         level,
-        hotelId: hotelId ? Number(hotelId) : null,
+        hotelId: hotelId || null,
         limit: PAGE,
         offset: nextOffset,
       });
@@ -279,7 +279,7 @@ export default function NotificationsPage() {
 
   const markAll = async () => {
     try {
-      const updated = await readAllNotifications(tenantCode, hotelId ? Number(hotelId) : null);
+      const updated = await readAllNotifications(tenantCode, hotelId || null);
       message.success(`已标记 ${updated} 条为已读`);
       notifyChanged();
       load(false);

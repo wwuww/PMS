@@ -171,7 +171,7 @@ export default function GuestsPage() {
     blackForm.resetFields();
     blackForm.setFieldsValue({
       level: 2,
-      hotel_id: g.hotel_id != null ? Number(g.hotel_id) : undefined,
+      hotel_id: g.hotel_id ?? undefined,
     });
   };
 
@@ -215,7 +215,7 @@ export default function GuestsPage() {
   const openEdit = (g: Guest) => {
     setEditing(g);
     form.setFieldsValue({
-      hotel_id: Number(g.hotel_id),
+      hotel_id: g.hotel_id,
       name: g.name,
       phone: g.phone ?? "",
       id_type: g.id_type ?? "ID",
@@ -268,7 +268,7 @@ export default function GuestsPage() {
         message.success("已更新宾客档案");
       } else {
         const body: GuestCreateBody = {
-          hotel_id: Number(v.hotel_id),
+          hotel_id: v.hotel_id,
           name: v.name,
           phone: v.phone || null,
           id_type: v.id_type,
@@ -491,7 +491,7 @@ export default function GuestsPage() {
             <Select
               allowClear
               placeholder="全租户"
-              options={hotels.map((h) => ({ label: h.name, value: Number(h.id) }))}
+              options={hotels.map((h) => ({ label: h.name, value: h.id }))}
             />
           </Form.Item>
         </Form>
@@ -515,7 +515,7 @@ export default function GuestsPage() {
           <Form.Item name="hotel_id" label="归属门店" rules={[{ required: true, message: "请选择门店" }]}>
             <Select
               placeholder="选择门店"
-              options={hotels.map((h) => ({ label: h.name, value: Number(h.id) }))}
+              options={hotels.map((h) => ({ label: h.name, value: h.id }))}
             />
           </Form.Item>
           <Form.Item name="name" label="姓名" rules={[{ required: true, message: "请输入姓名" }]}>

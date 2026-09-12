@@ -550,7 +550,7 @@ export default function ReceptionPage() {
                       <Select
                         showSearch
                         placeholder="选择房型"
-                        options={roomTypes.map((rt) => ({ value: Number(rt.id), label: rt.name }))}
+                        options={roomTypes.map((rt) => ({ value: rt.id, label: rt.name }))}
                       />
                     </Form.Item>
                     <Form.Item name="guest_name" label="客人姓名">

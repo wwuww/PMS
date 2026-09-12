@@ -288,9 +288,9 @@ export async function receptionContext(
   tenantCode: string,
   opts: {
     guest_phone?: string | null;
-    booking_id?: number | null;
+    booking_id?: number | string | null;
     room_no?: string | null;
-    hotel_id?: number | null;
+    hotel_id?: number | string | null;
   }
 ): Promise<ReceptionContext> {
   const params: Record<string, unknown> = {};
@@ -308,11 +308,11 @@ export async function receptionContext(
 export interface ReceptionAdvanceBody {
   action: string; // register | check_in | open_folio | check_out
   guest_phone?: string | null;
-  booking_id?: number | null;
+  booking_id?: number | string | null;
   room_no?: string | null;
-  hotel_id?: number | null;
+  hotel_id?: number | string | null;
   guest_name?: string | null;
-  room_type_id?: number | null;
+  room_type_id?: number | string | null;
   id_type?: string | null;
   id_no?: string | null;
   check_in_date?: string | null;
@@ -334,7 +334,7 @@ export async function receptionAdvance(
 // ---------- 团队 / 会议排房（M15，FR-GROUP） ----------
 
 export interface GroupBlockCreateBody {
-  hotel_id: number;
+  hotel_id: number | string;
   name: string;
   arrival_date: string;
   departure_date: string;
@@ -784,7 +784,7 @@ export async function housekeepingPerformance(
 ): Promise<HousekeepingPerformance> {
   const { data } = await http.get<HousekeepingPerformance>(
     `/tenants/${tenantCode}/analytics/housekeeping-performance`,
-    { params: { hotel_id: Number(hotelId), start_date: startDate, end_date: endDate } }
+    { params: { hotel_id: hotelId, start_date: startDate, end_date: endDate } }
   );
   return data;
 }
@@ -831,7 +831,7 @@ export async function listNotifications(
     unreadOnly?: boolean;
     refType?: string | null;
     level?: string | null;
-    hotelId?: number | null;
+    hotelId?: number | string | null;
     limit?: number;
     offset?: number;
   }
@@ -859,7 +859,7 @@ export async function readNotification(
 
 export async function readAllNotifications(
   tenantCode: string,
-  hotelId?: number | null
+  hotelId?: number | string | null
 ): Promise<number> {
   const params: Record<string, unknown> = {};
   if (hotelId != null) params.hotel_id = hotelId;
@@ -1147,7 +1147,7 @@ export async function searchGuests(
   if (opts.name) params.name = opts.name;
   if (opts.id_no) params.id_no = opts.id_no;
   if (opts.booking_id !== undefined && opts.booking_id !== null && `${opts.booking_id}` !== "")
-    params.booking_id = Number(opts.booking_id);
+    params.booking_id = opts.booking_id;
   const { data } = await http.get<Guest[]>(
     `/tenants/${tenantCode}/guests/search`,
     { params }
@@ -1878,7 +1878,7 @@ export async function upsertChannelRoomMapping(
 
 export async function deleteChannelRoomMapping(
   tenantCode: string,
-  mappingId: number
+  mappingId: number | string
 ): Promise<void> {
   await http.delete(`/tenants/${tenantCode}/ota/mappings/${mappingId}`);
 }
@@ -1911,7 +1911,7 @@ export async function upsertChannelRatePlan(
 
 export async function deleteChannelRatePlan(
   tenantCode: string,
-  planId: number
+  planId: number | string
 ): Promise<void> {
   await http.delete(`/tenants/${tenantCode}/ota/rate-plans/${planId}`);
 }
@@ -1999,7 +1999,7 @@ export async function listMenuItems(
 ): Promise<MenuItem[]> {
   const { data } = await http.get<MenuItem[]>(
     `/tenants/${tenantCode}/fnb/menu-items`,
-    { params: { hotel_id: Number(hotelId), active_only: activeOnly } }
+    { params: { hotel_id: hotelId, active_only: activeOnly } }
   );
   return data;
 }
@@ -2018,7 +2018,7 @@ export async function createMenuItem(
 ): Promise<MenuItem> {
   const { data } = await http.post<MenuItem>(
     `/tenants/${tenantCode}/fnb/menu-items`,
-    { ...body, hotel_id: Number(body.hotel_id) }
+    { ...body }
   );
   return data;
 }
@@ -2050,7 +2050,7 @@ export async function listTables(
 ): Promise<DiningTable[]> {
   const { data } = await http.get<DiningTable[]>(
     `/tenants/${tenantCode}/fnb/tables`,
-    { params: { hotel_id: Number(hotelId) } }
+    { params: { hotel_id: hotelId } }
   );
   return data;
 }
@@ -2068,7 +2068,7 @@ export async function createTable(
 ): Promise<DiningTable> {
   const { data } = await http.post<DiningTable>(
     `/tenants/${tenantCode}/fnb/tables`,
-    { ...body, hotel_id: Number(body.hotel_id) }
+    { ...body }
   );
   return data;
 }
@@ -2102,7 +2102,7 @@ export async function openPosOrder(
 ): Promise<PosOrder> {
   const { data } = await http.post<PosOrder>(
     `/tenants/${tenantCode}/fnb/orders`,
-    { ...body, hotel_id: Number(body.hotel_id) }
+    { ...body }
   );
   return data;
 }
@@ -2199,7 +2199,7 @@ export async function listPosOrders(
   hotelId: number | string,
   status?: string
 ): Promise<PosOrder[]> {
-  const params: Record<string, unknown> = { hotel_id: Number(hotelId) };
+  const params: Record<string, unknown> = { hotel_id: hotelId };
   if (status) params.status = status;
   const { data } = await http.get<PosOrder[]>(
     `/tenants/${tenantCode}/fnb/orders`,
@@ -2215,7 +2215,7 @@ export async function fnbReport(
   start?: string,
   end?: string
 ): Promise<FnbReport> {
-  const params: Record<string, unknown> = { hotel_id: Number(hotelId) };
+  const params: Record<string, unknown> = { hotel_id: hotelId };
   if (start) params.start = start;
   if (end) params.end = end;
   const { data } = await http.get<FnbReport>(
@@ -2231,7 +2231,7 @@ export async function listKitchenTickets(
   hotelId: number | string,
   states?: string
 ): Promise<KitchenTicket[]> {
-  const params: Record<string, unknown> = { hotel_id: Number(hotelId) };
+  const params: Record<string, unknown> = { hotel_id: hotelId };
   if (states) params.states = states;
   const { data } = await http.get<KitchenTicket[]>(
     `/tenants/${tenantCode}/fnb/kitchen/tickets`,
@@ -2413,7 +2413,7 @@ export async function createComplaint(
     hotel_id: number | string;
     guest_name: string;
     description?: string;
-    booking_id?: number | null;
+    booking_id?: number | string | null;
     guest_phone?: string | null;
     room_no?: string | null;
     source?: string;
@@ -2567,8 +2567,8 @@ export async function createDeposit(
 export async function listDeposits(
   tenantCode: string,
   opts?: {
-    hotel_id?: number;
-    booking_id?: number;
+    hotel_id?: number | string;
+    booking_id?: number | string;
     room_no?: string;
     status?: string;
     kind?: string;

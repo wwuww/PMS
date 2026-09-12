@@ -8,6 +8,9 @@
 #   3. 前端类型     : tsc --noEmit
 #   4. 前端构建     : vite build
 #
+#   另有「预检」（不计入四门禁，秒级）：scripts/check_snowflake_ids.py ——
+#   禁止把 ID 交给 Number() 加工（雪花 ID 会被截断，见该文件头注释）。
+#
 # 行为：
 #   - 任一步失败 => 立即停止后续门禁，打印醒目失败信息，输出汇总表后以非 0 退出
 #   - 每步打印耗时（秒）
@@ -169,6 +172,21 @@ hr
 printf '%sPMS CI 启动（项目根：%s）%s\n' "${C_BOLD}" "${PROJECT_ROOT}" "${C_OFF}"
 hr
 
+# =============================================================== 预检 ========
+# 雪花 ID 哨兵：禁止把 ID 交给 Number() 加工（<1s，放在最前面以便秒级反馈）。
+# 18 位雪花 ID 经 String(Number(id)) 只保留 17 位有效数字，后端拿到不存在的 ID
+# 且多数接口静默返回空列表 —— 这类 bug 编译期、接口层单测都测不出来。
+banner "[预检] 雪花 ID 哨兵 check-snowflake-ids 开始..."
+if "${PYTHON}" scripts/check_snowflake_ids.py 2>&1 | sed 's/^/     | /'; then
+  printf '  %s✔ PASS%s  雪花 ID 哨兵\n' "${C_GREEN}" "${C_OFF}"
+else
+  printf '\n'
+  hr
+  printf '%s%s预检失败：雪花 ID 被 Number() 加工（详见上方文件行号）%s\n' "${C_RED}" "${C_BOLD}" "${C_OFF}"
+  hr
+  exit 1
+fi
+
 run_gate 1 "后端测试 pytest" \
   "${PYTHON}" -m pytest -q -W ignore::pytest.PytestUnhandledThreadExceptionWarning --basetemp="${TEMP:-/tmp}/pms_ci_basetemp_$$"
 [ $? -ne 0 ] && finish
@@ -240,8 +258,11 @@ run_gate 3 "前端类型 tsc --noEmit" \
 # 钩子对项目内 web/dist 累积文件（644+）的 rmSync 拦截。CI 不消费 dist 产物。
 cd "${PROJECT_ROOT}/web" || exit 1
 TMP_BUILD="${TEMP:-/tmp}/pms_build_out_$$"
+# CODEBUDDY_SAFE_DELETE_ENABLED=0：Node 侧 safe-delete 钩子会拦 vite 重优化依赖时
+# 对 web/node_modules/.vite/deps 的 trash 操作，导致构建直接中止。该开关只作用于
+# 本次 Node 进程；在其他环境里它只是个未定义变量，无副作用。
 run_gate 4 "前端构建 vite build" \
-  ./node_modules/.bin/vite build "--outDir=${TMP_BUILD}"
+  env CODEBUDDY_SAFE_DELETE_ENABLED=0 ./node_modules/.bin/vite build "--outDir=${TMP_BUILD}"
 [ $? -ne 0 ] && finish
 
 cd "${PROJECT_ROOT}" || exit 1

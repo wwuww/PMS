@@ -180,7 +180,7 @@ export default function DepositQuickPanel({ bookingId, roomNo = null }: Props) {
     setSubmitting(true);
     try {
       const body: DepositIn = {
-        hotel_id: Number(hotelId),
+        hotel_id: hotelId,
         kind,
         method,
         amount: yuanToCents(amount),

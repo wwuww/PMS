@@ -94,7 +94,7 @@ export default function ComplaintsPage() {
         guest_name: v.guest_name,
         guest_phone: v.guest_phone || null,
         room_no: v.room_no || null,
-        booking_id: v.booking_id ? Number(v.booking_id) : null,
+        booking_id: v.booking_id || null,
         category: v.category,
         description: v.description || "",
         source: "FRONT_DESK",

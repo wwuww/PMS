@@ -70,7 +70,7 @@ export default function ApprovalsPage() {
     }
     const v = await form.validateFields();
     const payload: Record<string, unknown> = {};
-    if (v.bill_id) payload.bill_id = Number(v.bill_id);
+    if (v.bill_id) payload.bill_id = v.bill_id;
     // 折扣审批通过后自动落账：后端读 payload.amount（分，负向冲减）
     if (v.amount) payload.amount = -Math.round(v.amount * 100);
     try {

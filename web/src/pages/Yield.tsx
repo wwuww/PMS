@@ -84,7 +84,7 @@ export default function Yield() {
     const rt = searchParams.get("room_type");
     const v: Record<string, unknown> = {};
     if (d && dayjs(d).isValid()) v.business_date = dayjs(d);
-    if (rt) v.room_type_id = Number(rt);
+    if (rt) v.room_type_id = rt;
     if (Object.keys(v).length) recForm.setFieldsValue(v);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

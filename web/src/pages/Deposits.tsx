@@ -87,7 +87,7 @@ export default function Deposits() {
     setLoading(true);
     try {
       const list = await listDeposits(tenantCode, {
-        hotel_id: hotelId ? Number(hotelId) : undefined,
+        hotel_id: hotelId || undefined,
         status: filters.status && filters.status !== "ALL" ? filters.status : undefined,
         kind: filters.kind && filters.kind !== "ALL" ? filters.kind : undefined,
         room_no: filters.room_no?.trim() || undefined,
@@ -222,7 +222,7 @@ export default function Deposits() {
     const vals = await autoForm.validateFields();
     try {
       const out = await autoReleaseDeposits(tenantCode, {
-        hotel_id: Number(hotelId),
+        hotel_id: hotelId,
         days: vals.days ?? 30,
         operator: "front_desk",
       });

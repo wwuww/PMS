@@ -54,7 +54,7 @@ export default function DepositForm({ open, onClose, onCreated }: Props) {
     }
     const vals = await form.validateFields();
     const body: DepositIn = {
-      hotel_id: Number(hotelId),
+      hotel_id: hotelId,
       kind: vals.kind,
       method: vals.method,
       amount: yuanToCents(vals.amount),

@@ -1641,7 +1641,8 @@ export interface Deposit {
 }
 
 export interface DepositIn {
-  hotel_id: number;
+  // 雪花 ID：后端 pydantic lax 模式接受字符串，前端一律传 string 避免 JS number 截断
+  hotel_id: number | string;
   // ⚠️ 雪花 ID（18 位）必须允许 string：JS number 转字符串只保留 16~17 位有效数字，
   // 会把 ...338688 打印成 ...338700，后端拿到的是不存在的 ID 且只静默返回空列表。
   booking_id?: number | string | null;
@@ -1694,7 +1695,7 @@ export interface DepositVoidIn {
 }
 
 export interface AutoReleaseIn {
-  hotel_id?: number;
+  hotel_id?: number | string;
   days?: number;
   operator?: string;
 }

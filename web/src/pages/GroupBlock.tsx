@@ -118,7 +118,7 @@ export default function GroupBlockPage() {
       }
       const f = await (createFormRef.current?.validateFields() ?? Promise.reject());
       const body = {
-        hotel_id: Number(hotelId),
+        hotel_id: hotelId,
         name: f.name as string,
         arrival_date: (f.arrival_date as Dayjs).format("YYYY-MM-DD"),
         departure_date: (f.departure_date as Dayjs).format("YYYY-MM-DD"),
@@ -160,7 +160,7 @@ export default function GroupBlockPage() {
         guest_phone?: string;
       }[]).map((a) => ({
         room_no: a.room_no,
-        room_type_id: Number(a.room_type_id),
+        room_type_id: a.room_type_id,
         guest_name: a.guest_name || null,
         guest_phone: a.guest_phone || null,
       }));
@@ -400,7 +400,7 @@ export default function GroupBlockPage() {
                                   if (r)
                                     assignForm.setFieldValue(
                                       ["allocations", field.name, "room_type_id"],
-                                      Number(r.room_type_id)
+                                      r.room_type_id
                                     );
                                 }}
                               />
@@ -414,7 +414,7 @@ export default function GroupBlockPage() {
                                 placeholder="房型"
                                 style={{ width: 120 }}
                                 options={roomTypes.map((rt) => ({
-                                  value: Number(rt.id),
+                                  value: rt.id,
                                   label: rt.name,
                                 }))}
                               />

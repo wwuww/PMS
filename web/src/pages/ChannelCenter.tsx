@@ -121,7 +121,7 @@ function ConfigsTab() {
     const v = await form.validateFields();
     try {
       await upsertOtaConfig(tenantCode!, {
-        hotel_id: Number(v.hotel_id),
+        hotel_id: v.hotel_id,
         channel: v.channel,
         secret: v.secret,
         push_enabled: v.push_enabled ?? true,
@@ -242,9 +242,9 @@ function MappingsTab() {
     const v = await form.validateFields();
     try {
       await upsertChannelRoomMapping(tenantCode!, {
-        hotel_id: Number(v.hotel_id),
+        hotel_id: v.hotel_id,
         channel: v.channel,
-        pms_room_type_id: Number(v.pms_room_type_id),
+        pms_room_type_id: v.pms_room_type_id,
         external_room_type_code: v.external_room_type_code,
         enabled: v.enabled ?? true,
       });
@@ -259,7 +259,7 @@ function MappingsTab() {
 
   const onDelete = async (id: string | number) => {
     try {
-      await deleteChannelRoomMapping(tenantCode!, Number(id));
+      await deleteChannelRoomMapping(tenantCode!, id);
       message.success("已删除");
       load();
     } catch (e: any) {
@@ -315,7 +315,7 @@ function MappingsTab() {
                   form.setFieldsValue({
                     hotel_id: r.hotel_id,
                     channel: r.channel,
-                    pms_room_type_id: Number(r.pms_room_type_id),
+                    pms_room_type_id: r.pms_room_type_id,
                     external_room_type_code: r.external_room_type_code,
                     enabled: !!r.enabled,
                   });
@@ -360,7 +360,7 @@ function MappingsTab() {
               showSearch
               optionFilterProp="label"
               options={roomTypes.map((r) => ({
-                value: Number(r.id),
+                value: r.id,
                 label: `${r.name}（${r.code}）`,
               }))}
             />
@@ -414,9 +414,9 @@ function RatesTab() {
     const v = await form.validateFields();
     try {
       await upsertChannelRatePlan(tenantCode!, {
-        hotel_id: Number(v.hotel_id),
+        hotel_id: v.hotel_id,
         channel: v.channel,
-        pms_room_type_id: Number(v.pms_room_type_id),
+        pms_room_type_id: v.pms_room_type_id,
         effective_date: v.effective_date ? v.effective_date.format("YYYY-MM-DD") : null,
         price_cents: yuanToCents(Number(v.price_yuan)),
         enabled: v.enabled ?? true,
@@ -432,7 +432,7 @@ function RatesTab() {
 
   const onDelete = async (id: string | number) => {
     try {
-      await deleteChannelRatePlan(tenantCode!, Number(id));
+      await deleteChannelRatePlan(tenantCode!, id);
       message.success("已删除");
       load();
     } catch (e: any) {
@@ -497,7 +497,7 @@ function RatesTab() {
                   form.setFieldsValue({
                     hotel_id: r.hotel_id,
                     channel: r.channel,
-                    pms_room_type_id: Number(r.pms_room_type_id),
+                    pms_room_type_id: r.pms_room_type_id,
                     effective_date: r.effective_date ? dayjs(r.effective_date) : null,
                     price_yuan: r.price_cents / 100,
                     enabled: !!r.enabled,
@@ -543,7 +543,7 @@ function RatesTab() {
               showSearch
               optionFilterProp="label"
               options={roomTypes.map((r) => ({
-                value: Number(r.id),
+                value: r.id,
                 label: `${r.name}（${r.code}）`,
               }))}
             />

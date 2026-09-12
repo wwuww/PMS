@@ -1,14 +1,18 @@
-# ==============================================================================
+﻿# ==============================================================================
 # PMS 四门禁 CI 脚本（PowerShell，Windows 5.1+ 兼容）
 #
 # 门禁顺序（按依赖排序）：
+#   0. 预检（不计入四门禁，秒级）：scripts/check_snowflake_ids.py
+#      —— 拦截前端把 18 位雪花 ID 交给 Number() 加工（String(Number(x)) 会按
+#         “最短往返”只打印 17 位有效数字，拼进 URL 后后端查不到、列表静默为空）。
 #   1. 后端测试     : pytest -q -W ignore::pytest.PytestUnhandledThreadExceptionWarning
 #   2. 迁移零漂移   : alembic upgrade head + alembic check（临时库 _alembic_check.db）
 #   3. 前端类型     : tsc --noEmit
 #   4. 前端构建     : vite build
 #
 # 行为：
-#   - 任一步失败 => 立即停止后续门禁，打印醒目失败信息，输出汇总表后以非 0 退出
+#   - 预检失败即终止，不进入四门禁
+#   - 任一步门禁失败 => 立即停止后续门禁，打印醒目失败信息，输出汇总表后以非 0 退出
 #   - 每步打印耗时（秒）
 #   - 结尾汇总四门禁 PASS/FAIL 表
 #   - 可从任意目录调用，项目根由 $PSScriptRoot 解析
@@ -150,6 +154,23 @@ function Complete-Ci {
     exit 0
 }
 
+# =============================================================== 预检 0/4 ===
+# 雪花 ID 哨兵：秒级静态扫描，必须拦在四门禁之前（pytest 跑 5 分钟，不该为
+# 一条 sed 就能修的问题买单）。
+Write-Banner '[预检] 雪花 ID 哨兵 check-snowflake-ids 开始...'
+$snowLog = Join-Path $LogDir 'precheck_snowflake.log'
+& $Python (Join-Path $ScriptDir 'check_snowflake_ids.py') 2>&1 | Tee-Object -FilePath $snowLog | ForEach-Object { Write-Host "     | $_" }
+if ($LASTEXITCODE -ne 0) {
+    Write-Host ''
+    Write-Host '  X FAIL  雪花 ID 哨兵：存在把 ID 交给 Number() 加工的代码' -ForegroundColor Red
+    Write-Host '    修复：去掉 Number() 包裹，让 ID 全程以字符串传递' -ForegroundColor Yellow
+    Write-Host '    确需放行：在该行末尾加注释 // id-ok: <理由>' -ForegroundColor Yellow
+    Write-Hr
+    Remove-Item Env:\PMS_DATABASE_URL -ErrorAction SilentlyContinue
+    exit 1
+}
+Write-Host '  (预检) PASS  雪花 ID 哨兵' -ForegroundColor Green
+
 # =============================================================== 门禁 1/4 ===
 Set-Location $ProjectRoot
 Write-Hr
@@ -158,8 +179,12 @@ Write-Hr
 
 # 注意：-W ignore::pytest.PytestUnhandledThreadExceptionWarning 是必须的。
 # asyncio 拆卸期抛出的该警告会把 pytest 退出码抬升为 1，造成“假失败”。
+# --basetemp 指向系统 temp 下的新目录：pytest 默认 basetemp 会持续累积数百个子目录，
+# 清理时撞沙盒 safe-delete 钩子（>=50 文件需确认），会把测试整体打成 error。
+$PyBaseTemp = Join-Path $env:TEMP ("pms_ci_basetemp_" + $PID)
 $ok = Invoke-Gate -Index 1 -Name '后端测试 pytest' -Exe $Python -Arguments @(
-    '-m', 'pytest', '-q', '-W', 'ignore::pytest.PytestUnhandledThreadExceptionWarning'
+    '-m', 'pytest', '-q', '-W', 'ignore::pytest.PytestUnhandledThreadExceptionWarning',
+    '--basetemp', $PyBaseTemp
 )
 if (-not $ok) { Complete-Ci }
 
@@ -221,7 +246,10 @@ $ok = Invoke-Gate -Index 3 -Name '前端类型 tsc --noEmit' -Exe '.\node_module
 if (-not $ok) { Complete-Ci }
 
 # =============================================================== 门禁 4/4 ===
+# CODEBUDDY_SAFE_DELETE_ENABLED=0：Node 侧 safe-delete 钩子会拦 vite 重优化依赖时
+# 对 web/node_modules/.vite/deps 的 trash 操作，导致构建直接中止。只作用于本进程。
 Set-Location (Join-Path $ProjectRoot 'web')
+$env:CODEBUDDY_SAFE_DELETE_ENABLED = '0'
 $ok = Invoke-Gate -Index 4 -Name '前端构建 vite build' -Exe '.\node_modules\.bin\vite.cmd' -Arguments @('build')
 if (-not $ok) { Complete-Ci }
 

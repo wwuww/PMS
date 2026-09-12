@@ -118,7 +118,7 @@ export default function ReceptionWorkbenchPage() {
     if (!tenantCode) return;
     const body = {
       guest_phone: query.guest_phone.trim() || null,
-      booking_id: query.booking_id.trim() ? Number(query.booking_id.trim()) : null,
+      booking_id: query.booking_id.trim() || null,
       room_no: query.room_no.trim() || null,
     };
     if (!body.guest_phone && !body.booking_id && !body.room_no) {
@@ -140,7 +140,7 @@ export default function ReceptionWorkbenchPage() {
     if (!tenantCode) return;
     const body = {
       guest_phone: query.guest_phone.trim() || null,
-      booking_id: query.booking_id.trim() ? Number(query.booking_id.trim()) : null,
+      booking_id: query.booking_id.trim() || null,
       room_no: query.room_no.trim() || null,
     };
     const c = await receptionContext(tenantCode, body);
@@ -207,7 +207,7 @@ export default function ReceptionWorkbenchPage() {
             return;
           }
           body.room_no = room.room_no;
-          body.room_type_id = Number(room.room_type_id);
+          body.room_type_id = room.room_type_id;
           body.guest_name = v.guest_name;
           body.check_in_date = (v.check_in_date as Dayjs).format("YYYY-MM-DD");
           body.check_out_date = (v.check_out_date as Dayjs).format("YYYY-MM-DD");
@@ -573,7 +573,7 @@ export default function ReceptionWorkbenchPage() {
               <Form.Item name="hotel_id" label="门店" rules={[{ required: true, message: "请选择门店" }]}>
                 <Select
                   placeholder="选择门店"
-                  options={hotels.map((h) => ({ value: Number(h.id), label: h.name }))}
+                  options={hotels.map((h) => ({ value: h.id, label: h.name }))}
                 />
               </Form.Item>
               <Form.Item name="guest_name" label="客人姓名" rules={[{ required: true, message: "请填写姓名" }]}>
@@ -605,7 +605,7 @@ export default function ReceptionWorkbenchPage() {
               <Form.Item name="hotel_id" label="归属门店" rules={[{ required: true, message: "请选择归属门店" }]}>
                 <Select
                   placeholder="选择门店"
-                  options={hotels.map((h) => ({ value: Number(h.id), label: h.name }))}
+                  options={hotels.map((h) => ({ value: h.id, label: h.name }))}
                 />
               </Form.Item>
               <Typography.Paragraph type="secondary">
