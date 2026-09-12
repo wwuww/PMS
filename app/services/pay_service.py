@@ -14,6 +14,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import uuid
 from datetime import UTC, datetime
 from typing import Any
@@ -21,6 +23,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.events.base import PayOrderClosed, PayOrderPaid
 from app.events.bus import event_bus
 from app.models import Bill, Payment, PayNotify, PayOrder
@@ -30,6 +33,53 @@ PAY_STATUS_CREATED = "CREATED"
 PAY_STATUS_PAID = "PAID"
 PAY_STATUS_CLOSED = "CLOSED"
 STALE_STATUSES = (PAY_STATUS_CREATED, "PAYING")
+
+# 回调验签失败时的统一错误码（不含任何可探测内部状态的信息）
+PAY_SIGN_INVALID = "SIGN_INVALID"
+PAY_SIGN_NOT_CONFIGURED = "SIGN_NOT_CONFIGURED"
+
+
+class PayNotifySignatureError(Exception):
+    """支付回调验签失败。路由层据此返回 401，不进入任何落账逻辑。"""
+
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+        self.message = message
+
+
+def sign_payload(secret: str, raw_body: bytes) -> str:
+    """回调签名算法：HMAC-SHA256(secret, 原始请求体)。与 OTA webhook 同一套契约。
+
+    注意必须用**原始字节**而非解析后的 dict——JSON 序列化顺序/空白不可靠。
+    """
+    return hmac.new(secret.encode("utf-8"), raw_body, hashlib.sha256).hexdigest()
+
+
+def verify_pay_notify_signature(raw_body: bytes, signature: str | None) -> None:
+    """校验支付回调签名。失败抛 ``PayNotifySignatureError``，成功静默返回。
+
+    安全要点：
+    - 使用 ``hmac.compare_digest`` 防时序攻击；
+    - 无签名 / 空签名一律拒绝（不做"未配置就放行"的宽松分支）；
+    - 生产（``require_pay_notify_secret=True``）未注入密钥时**拒绝全部回调**，
+      走人工补单，避免默认密钥被利用。
+    """
+    settings = get_settings()
+    secret = settings.pay_notify_secret
+
+    if not secret:
+        if settings.require_pay_notify_secret:
+            raise PayNotifySignatureError(
+                PAY_SIGN_NOT_CONFIGURED, "支付回调密钥未配置，拒绝回调"
+            )
+        # dev/测试：无密钥则视为未启用验签（保持既有测试与本地联调可用）
+        return
+
+    if not signature:
+        raise PayNotifySignatureError(PAY_SIGN_INVALID, "缺少回调签名")
+    if not hmac.compare_digest(sign_payload(secret, raw_body), signature):
+        raise PayNotifySignatureError(PAY_SIGN_INVALID, "回调签名校验失败")
 
 
 def _as_utc(dt: datetime | None) -> datetime | None:

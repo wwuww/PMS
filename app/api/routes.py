@@ -341,7 +341,11 @@ from app.services.permissions import (
     COUPON_MANAGE,
     BREAKFAST_MANAGE,
 )
-from app.services.pay_service import PayService
+from app.services.pay_service import (
+    PayNotifySignatureError,
+    PayService,
+    verify_pay_notify_signature,
+)
 from app.services.price_service import PriceService
 from app.services.psb_service import PsbService
 from app.services.rbac_service import RbacService
@@ -2776,9 +2780,26 @@ async def mp_order_detail(
 
 @router.post("/tenants/{tenant_id}/pay/notify", response_model=PayNotifyResultOut)
 async def pay_notify(
-    tenant_id: str, body: PayNotifyIn, session: AsyncSession = Depends(get_session)
+    tenant_id: str,
+    request: Request,
+    body: PayNotifyIn,
+    x_pay_sign: str | None = Header(default=None),
+    session: AsyncSession = Depends(get_session),
 ) -> dict:
-    """支付回调（mock 微信通知）：幂等去重 + 金额校验 + 支付成功落账。"""
+    """支付回调（mock 微信通知）：验签 + 幂等去重 + 金额校验 + 支付成功落账。
+
+    安全：``X-Pay-Sign = HMAC-SHA256(secret, 原始请求体)``，密钥见
+    ``settings.pay_notify_secret``。验签失败返 401 且不写任何回调流水，
+    防止伪造支付成功（P0）。未配置密钥时行为见 ``verify_pay_notify_signature``。
+    """
+    raw = await request.body()
+    try:
+        verify_pay_notify_signature(raw, x_pay_sign)
+    except PayNotifySignatureError as exc:
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED, f"支付回调验签失败：{exc.message}"
+        ) from exc
+
     svc = PayService(session)
     result = await svc.handle_notify(
         tenant_id,

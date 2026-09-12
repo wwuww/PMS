@@ -37,6 +37,13 @@ class Settings(BaseSettings):
     rate_limit_default: str = "240/60"
     rate_limit_auth: str = "10/60"
 
+    # ----- 支付回调验签（P0 安全）-----
+    # 生产必须通过 PMS_PAY_NOTIFY_SECRET 注入；留空 = dev/测试用内置默认值。
+    # 校验方式：X-Pay-Sign = HMAC-SHA256(secret, raw_body)，与 OTA webhook 同一套契约。
+    pay_notify_secret: str = ""
+    # 生产环境（debug=False）未配置密钥时，回调一律拒绝而不是放行——避免"默认密钥"裸奔。
+    require_pay_notify_secret: bool = False
+
 
 @lru_cache
 def get_settings() -> Settings:

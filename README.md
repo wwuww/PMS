@@ -301,6 +301,9 @@ python -m venv .venv
 - `app/models/pay.py`：`PayOrder`（out_trade_no 租户内唯一、amount_cents、状态 CREATED|PAID|CLOSED、prepay_id/transaction_id/paid_at/close_reason）、`PayNotify`（notify_id 唯一约束幂等去重 + 原始报文留痕 WORM 基线）。
 - `app/services/pay_service.py`：
   - **统一下单**（`_unified_order` mock prepay_id，真实签名/证书对接按同一契约替换 `_wechat_*`）；
+  - **回调验签（P0）**：`X-Pay-Sign = HMAC-SHA256(secret, 原始请求体)`，密钥 `PMS_PAY_NOTIFY_SECRET`；
+    无签名/错签名 → **401 且不写回调流水、不落账**；生产可置 `PMS_REQUIRE_PAY_NOTIFY_SECRET=true`，
+    未配密钥时**拒绝全部回调**（走人工补单），避免默认密钥被利用；
   - **回调幂等**：同 `notify_id` 去重 DUPLICATE；订单已 PAID 的迟到重放回调放行为 DUPLICATE 不重复落账；
   - **金额校验**：回调金额 ≠ 支付单金额 → REJECTED（防篡改），订单状态不被篡改；
   - **支付成功落账**：预订已有 OPEN 账单 → 直接落 `Payment(WECHAT, ref_no=transaction_id)` 并回填 `bill_id`；尚未开单 → 标记 PAID，开单后经 `apply_prepay()` 预付抵扣；
@@ -317,6 +320,8 @@ python -m venv .venv
 | 回调成功落账（已开账单直接落 Payment） | ✅ 余额 60000→0 |
 | 回调幂等（同 notify_id / 迟到重放 DUPLICATE） | ✅ |
 | 金额篡改拒绝（REJECTED，状态不被篡改） | ✅ |
+| **回调验签：无签名/错签名 → 401 且不落账** | ✅ 6 个新用例 |
+| **生产未配密钥时拒绝全部回调** | ✅ |
 | 预付抵扣（开单晚于回调 → apply-prepay） | ✅ 余额归零 |
 | 掉单对账关单 + 已关单迟到回调拒绝 | ✅ CLOSED / REJECTED |
 | 小程序预付订单完成入住结账闭环 | ✅ SETTLED balance=0 |
