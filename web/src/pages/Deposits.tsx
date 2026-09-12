@@ -1,6 +1,6 @@
 // 押金管理主页面（M32.18 T05）：
 // 列表（筛选 + 分页上限）+ 新建 + 详情抽屉 + 行内动作（冲抵/退款/释放/作废）+ 超期预授权批量释放。
-// 权限门控：useCan(DEPOSIT_MANAGE/DEPOSIT_REFUND/NIGHT_AUDIT_RUN) 与 meta.canAct 双重叠加。
+// 权限门控：useCan(PERM.DEPOSIT_MANAGE/PERM.DEPOSIT_REFUND/PERM.NIGHT_AUDIT_RUN) 与 meta.canAct 双重叠加。
 import { useCallback, useEffect, useState } from "react";
 import {
   Button,
@@ -29,7 +29,7 @@ import {
 import type { Deposit } from "../api/types";
 import { useTenant } from "../store/tenant";
 import { fmtCents, yuanToCents } from "../utils/format";
-import { currentOperator, useCan } from "../utils/permission";
+import { PERM, currentOperator, useCan } from "../utils/permission";
 import DepositForm from "../components/deposit/DepositForm";
 import DepositDetailDrawer from "../components/deposit/DepositDetailDrawer";
 import {
@@ -60,9 +60,9 @@ type ActionKind = "apply" | "refund" | "void" | "capture";
 
 export default function Deposits() {
   const { tenantCode, hotelId } = useTenant();
-  const canManage = useCan("DEPOSIT_MANAGE");
-  const canRefund = useCan("DEPOSIT_REFUND");
-  const canNight = useCan("NIGHT_AUDIT_RUN");
+  const canManage = useCan(PERM.DEPOSIT_MANAGE);
+  const canRefund = useCan(PERM.DEPOSIT_REFUND);
+  const canNight = useCan(PERM.NIGHT_AUDIT_RUN);
 
   const [filters, setFilters] = useState<Filters>({ limit: 50 });
   const [data, setData] = useState<Deposit[]>([]);

@@ -32,7 +32,7 @@ import type {
   GuestIdType,
   GuestVipLevel,
 } from "../api/types";
-import { currentOperator, useCan } from "../utils/permission";
+import { PERM, currentOperator, useCan } from "../utils/permission";
 
 /** 黑名单等级：0 提示 / 1 警告 / 2 限制 / 3 拒绝入住。 */
 const BLACK_LEVEL_OPTIONS = [
@@ -78,7 +78,7 @@ export default function GuestsPage() {
   const { tenantCode } = useTenant();
   const navigate = useNavigate();
   const { message } = AntApp.useApp();
-  const canBlacklist = useCan("BLACKLIST_MANAGE");
+  const canBlacklist = useCan(PERM.BLACKLIST_MANAGE);
 
   const [list, setList] = useState<Guest[]>([]);
   const [loading, setLoading] = useState(false);

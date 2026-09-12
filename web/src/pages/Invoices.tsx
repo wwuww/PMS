@@ -1,6 +1,6 @@
 // 批次③ - 发票管理主页面
 // 列表（筛选 + 分页）+ 开票 Modal（消费/开票额校验 + 专票税号 + 大额审批人）+ 作废 Popconfirm
-// 门控：useCan(INVOICE_MANAGE)，后端同时要求 invoice.manage（路由级） + 表单层校验
+// 门控：useCan(PERM.INVOICE_MANAGE)，映射为后端权限码 invoice.manage（路由级） + 表单层校验
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Button,
@@ -29,7 +29,7 @@ import {
 import type { Invoice } from "../api/types";
 import { useTenant } from "../store/tenant";
 import { CellAmount } from "../utils/format.tsx";
-import { currentOperator, useCan } from "../utils/permission";
+import { PERM, currentOperator, useCan } from "../utils/permission";
 
 // 后端阈值：开票额 - 消费额 > 1000 分（即 ¥10）时 approver 必填
 const APPROVER_THRESHOLD_CENTS = 1000;
@@ -62,7 +62,7 @@ interface Filters {
 
 export default function Invoices() {
   const { tenantCode } = useTenant();
-  const canManage = useCan("INVOICE_MANAGE");
+  const canManage = useCan(PERM.INVOICE_MANAGE);
 
   const [filters, setFilters] = useState<Filters>({
     status: "ALL",

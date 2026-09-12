@@ -44,7 +44,7 @@ import type {
   Invoice,
   PaymentMethod,
 } from "../api/types";
-import { currentOperator, useCan } from "../utils/permission";
+import { PERM, currentOperator, useCan } from "../utils/permission";
 
 // 后端阈值：开票额 - 消费额 > 1000 分（即 ¥10）时 approver 必填
 const INVOICE_APPROVER_THRESHOLD = 1000;
@@ -114,7 +114,7 @@ export default function Billing() {
   const [loading, setLoading] = useState(false);
   const [sourceFilter, setSourceFilter] = useState<string>("ALL");
 
-  const canManageInvoice = useCan("INVOICE_MANAGE");
+  const canManageInvoice = useCan(PERM.INVOICE_MANAGE);
 
   const [openId, setOpenId] = useState<string | null>(null);
   const [detail, setDetail] = useState<Bill | null>(null);

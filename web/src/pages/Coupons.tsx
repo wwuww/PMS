@@ -1,6 +1,6 @@
 // 批次④ - 优惠券管理（券模板 + 券实例）
 // Tab1 券模板：列表 + 新建模板 Modal；Tab2 券实例：列表 + 发券 Modal + 核销输入 + 作废
-// 门控：useCan("COUPON_MANAGE")，后端要求 coupon.manage
+// 门控：useCan(PERM.COUPON_MANAGE)，映射为后端权限码 coupon.manage
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Button,
@@ -33,7 +33,7 @@ import {
 } from "../api/endpoints";
 import type { Coupon, CouponTemplate } from "../api/types";
 import { useTenant } from "../store/tenant";
-import { currentOperator, useCan } from "../utils/permission";
+import { PERM, currentOperator, useCan } from "../utils/permission";
 
 const { RangePicker } = DatePicker;
 
@@ -83,7 +83,7 @@ function renderDiscount(type?: string | null, value?: number | null): string {
 
 export default function Coupons() {
   const { tenantCode } = useTenant();
-  const canManage = useCan("COUPON_MANAGE");
+  const canManage = useCan(PERM.COUPON_MANAGE);
 
   const [tab, setTab] = useState<string>("templates");
 

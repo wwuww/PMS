@@ -45,7 +45,7 @@ import { useTenant } from "../../store/tenant";
 import { yuanToCents } from "../../utils/format";
 // 必须带 .tsx 后缀：无后缀会优先解析到 format.ts（纯字符串工具），取不到组件。
 import { CellAmount } from "../../utils/format.tsx";
-import { currentOperator, useCan } from "../../utils/permission";
+import { PERM, currentOperator, useCan } from "../../utils/permission";
 import DepositDetailDrawer from "./DepositDetailDrawer";
 import type { DepositActionType } from "./meta";
 import { KIND_LABELS, METHOD_LABELS, STATUS_META, canAct } from "./meta";
@@ -106,7 +106,7 @@ export default function DepositQuickPanel({ bookingId, roomNo = null }: Props) {
   const { tenantCode, hotelId } = useTenant();
   const { message } = App.useApp();
   const navigate = useNavigate();
-  const canManage = useCan("DEPOSIT_MANAGE");
+  const canManage = useCan(PERM.DEPOSIT_MANAGE);
 
   const [rows, setRows] = useState<Deposit[]>([]);
   const [loading, setLoading] = useState(false);

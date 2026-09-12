@@ -1,6 +1,6 @@
 // 批次④ - 早餐券管理（含餐厅核销）
 // 列表（订单号/类型/是否已用/日期范围筛选）+ 发券 Modal + 核销区 + 行内作废
-// 门控：useCan("BREAKFAST_MANAGE")，后端要求 breakfast.manage
+// 门控：useCan(PERM.BREAKFAST_MANAGE)，映射为后端权限码 breakfast.manage
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Button,
@@ -29,7 +29,7 @@ import {
 } from "../api/endpoints";
 import type { BreakfastTicket } from "../api/types";
 import { useTenant } from "../store/tenant";
-import { currentOperator, useCan } from "../utils/permission";
+import { PERM, currentOperator, useCan } from "../utils/permission";
 
 const { RangePicker } = DatePicker;
 
@@ -68,7 +68,7 @@ function ticketStatus(t: BreakfastTicket): { label: string; color: string } {
 
 export default function Breakfast() {
   const { tenantCode } = useTenant();
-  const canManage = useCan("BREAKFAST_MANAGE");
+  const canManage = useCan(PERM.BREAKFAST_MANAGE);
 
   const [filters, setFilters] = useState<Filters>({
     booking_id: "",
