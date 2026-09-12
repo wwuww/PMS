@@ -126,7 +126,13 @@ export default function CheckInRegister() {
   const [bookings, setBookings] = useState<Booking[]>([]);
 
   const [roomNo, setRoomNo] = useState<string>(roomNoParam);
-  const [bookingId, setBookingId] = useState<number | null>(bookingIdParam ? Number(bookingIdParam) : null);
+  // ⚠️ 雪花 ID 必须全程以字符串传递，绝对不要 Number() 化。
+  // 订单 ID 是 18 位（如 354986244532338688），远超 Number.MAX_SAFE_INTEGER。
+  // 虽然 double 本身能精确存下它（BigInt(Number(s)) 与原值相等），但 JS 把 number
+  // 转回字符串时按「最短往返」只打印 17 位有效数字 → ...338688 会变成 ...338700。
+  // 拼进 URL 后后端拿到的是不存在的 ID，且只静默返回空列表（不报错），极难发现。
+  // 后端 JSON 里 ID 本来就是字符串（{"id":"354986244532338688"}），照原样传即可。
+  const [bookingId, setBookingId] = useState<string | null>(bookingIdParam || null);
 
   // 顶部页签
   const [topTab, setTopTab] = useState("info");
@@ -195,7 +201,7 @@ export default function CheckInRegister() {
           .filter((b) => b.room_no === roomNoParam && b.status === "created")
           .sort((a, b) => (a.check_in_date || "").localeCompare(b.check_in_date || ""))[0];
         if (matched) {
-          setBookingId(Number(matched.id));
+          setBookingId(matched.id);
           setForm((f) => ({
             ...f,
             guest_name: matched.guest_name || f.guest_name,
@@ -264,9 +270,9 @@ export default function CheckInRegister() {
   );
   const isStay = room?.state === "occupied" && !!stayBooking;
   // 押金面板绑定的登记单：在住单优先，其次预订单，再退回 URL 带入的 booking_id；散客新建时为 null
-  const depositBookingId = useMemo<number | null>(() => {
+  const depositBookingId = useMemo<string | null>(() => {
     const id = stayBooking?.id ?? booking?.id ?? bookingId;
-    return id != null ? Number(id) : null;
+    return id != null ? String(id) : null;
   }, [stayBooking, booking, bookingId]);
   // 在住模式：把登记单客人信息回填表单（只读展示）
   useEffect(() => {
@@ -425,7 +431,8 @@ export default function CheckInRegister() {
         guarantee_hold_until: form.guarantee_hold_until.trim() || null,
       };
       if (booking) {
-        payload.booking_id = Number(booking.id);
+        // ⚠️ 不要 Number()：JSON 序列化会把它打成 17 位有效数字（...338700），后端静默查不到
+        payload.booking_id = String(booking.id);
       } else if (form.hourly) {
         // M32.17：钟点房——同日入住退房，按小时计价，不占过夜可售房量
         payload.room_type_id = form.room_type_id ?? room?.room_type_id;
@@ -819,9 +826,9 @@ export default function CheckInRegister() {
             placeholder="选择已有预订转预订入住（可清空保持散客）"
             allowClear
             value={undefined}
-            onChange={(v) => v && setBookingId(Number(v))}
+            onChange={(v) => v && setBookingId(String(v))}
             options={createdBookings.map((b) => ({
-              value: Number(b.id),
+              value: String(b.id),
               label: `#${b.id} ${b.guest_name} · ${b.check_in_date}~${b.check_out_date}`,
             }))}
           />

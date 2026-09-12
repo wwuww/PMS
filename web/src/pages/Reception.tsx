@@ -514,7 +514,8 @@ export default function ReceptionPage() {
                         showSearch
                         placeholder="选择 CREATED 预订"
                         options={resvBookings.map((b) => ({
-                          value: Number(b.id),
+                          // ⚠️ 雪花 ID 不要 Number()：JSON 序列化会截成 17 位有效数字
+                          value: String(b.id),
                           label: `${b.guest_name} · ${rtName(b.room_type_id)} · ${b.check_in_date} · ${b.room_no ?? "未排房"}`,
                         }))}
                       />

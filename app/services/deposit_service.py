@@ -241,6 +241,20 @@ class DepositService:
         )
         return d, list(res.scalars())
 
+    async def _find_open_bill_id(self, tenant_id: str, booking_id: int) -> int | None:
+        """取该订单当前在开的账单（多笔时取最新）。用于冲抵的目标账单兜底。"""
+        res = await self.session.execute(
+            select(Bill.id)
+            .where(
+                Bill.tenant_id == tenant_id,
+                Bill.booking_id == booking_id,
+                Bill.status == "OPEN",
+            )
+            .order_by(Bill.id.desc())
+            .limit(1)
+        )
+        return res.scalar_one_or_none()
+
     # ---- 冲抵 / 退款 / 作废 / 没收 / 释放 ----
     async def apply(
         self,
@@ -270,6 +284,12 @@ class DepositService:
             )
 
         bill_id = target_bill_id or d.bill_id
+        if bill_id is None and d.booking_id is not None:
+            # 开押时不绑账单是常态（快捷面板只带 booking_id + room_no，押金管理页同样
+            # 不采集账单）。冲抵在业务上就是「抵这位客人的账」，因此回退到该订单的在开
+            # 账单，否则前端两处冲抵入口都会 100% 撞 DEPOSIT_BILL_REQUIRED。
+            # 只用于本次冲抵，不回写 d.bill_id —— 保留跨账单冲抵能力（bill_id 可空的设计意图）。
+            bill_id = await self._find_open_bill_id(tenant_id, d.booking_id)
         if bill_id is None:
             raise DepositError("DEPOSIT_BILL_REQUIRED", "冲抵必须指定目标账单")
         bill = await self.session.get(Bill, bill_id)

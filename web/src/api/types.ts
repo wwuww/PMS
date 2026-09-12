@@ -162,7 +162,8 @@ export interface BookingCreate {
 
 /** 统一接待办理（预订/散客双模式入住）。 */
 export interface ReceptionCheckIn {
-  booking_id?: number | null;
+  // ⚠️ 雪花 ID（18 位）优先传 string：number 会在 JSON 序列化时被截断成 17 位有效数字。
+  booking_id?: number | string | null;
   room_no: string;
   room_type_id?: number | null;
   guest_name?: string | null;
@@ -1641,9 +1642,11 @@ export interface Deposit {
 
 export interface DepositIn {
   hotel_id: number;
-  booking_id?: number | null;
+  // ⚠️ 雪花 ID（18 位）必须允许 string：JS number 转字符串只保留 16~17 位有效数字，
+  // 会把 ...338688 打印成 ...338700，后端拿到的是不存在的 ID 且只静默返回空列表。
+  booking_id?: number | string | null;
   room_no?: string | null;
-  bill_id?: number | null;
+  bill_id?: number | string | null;
   kind: DepositKind;
   method: DepositMethod;
   amount: number;

@@ -51,8 +51,9 @@ import type { DepositActionType } from "./meta";
 import { KIND_LABELS, METHOD_LABELS, STATUS_META, canAct } from "./meta";
 
 interface Props {
-  /** 当前登记单对应的预订 ID；散客尚未办理入住时为 null（此时只提示、不请求） */
-  bookingId: number | null;
+  /** 当前登记单对应的预订 ID；散客尚未办理入住时为 null（此时只提示、不请求）
+   *  ⚠️ 必须是 string：18 位雪花 ID 经 JS number 中转再拼 URL/JSON 会被截断成 17 位有效数字。 */
+  bookingId: string | null;
   /** 房号（开押时带入，便于收银/夜审按房查询） */
   roomNo?: string | null;
 }

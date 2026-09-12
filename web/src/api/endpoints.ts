@@ -2652,7 +2652,10 @@ export async function autoReleaseDeposits(
 
 export async function listDepositsByBooking(
   tenantCode: string,
-  bookingId: number
+  // ⚠️ 必须是 string：订单 ID 是 18 位雪花，超过 Number.MAX_SAFE_INTEGER，
+  // 经 JS number 再拼进 URL 会被打印成 17 位（...338688 → ...338700），
+  // 后端拿到不存在的 ID 只静默返回空列表。后端 JSON 里 ID 本就是字符串。
+  bookingId: string
 ): Promise<Deposit[]> {
   const { data } = await http.get<Deposit[]>(`/tenants/${tenantCode}/bookings/${bookingId}/deposits`);
   return data;
