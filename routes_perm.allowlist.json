@@ -1,10 +1,10 @@
 {
-  "generated_at": "2026-09-07T06:52:45+00:00",
-  "total_routes": 196,
-  "protected_count": 30,
-  "unprotected_count": 166,
+  "generated_at": "2026-09-12T12:22:16+00:00",
+  "total_routes": 242,
+  "protected_count": 65,
+  "unprotected_count": 177,
   "unprotected_writes_count": 89,
-  "unprotected_reads_count": 77,
+  "unprotected_reads_count": 88,
   "items": [
     {
       "method": "POST",
@@ -283,6 +283,12 @@
       "is_write": true
     },
     {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/bills/{bill_id}/invoices",
+      "has_perm": true,
+      "is_write": false
+    },
+    {
       "method": "POST",
       "path": "/api/v1/tenants/{tenant_id}/bills/{bill_id}/pay-points",
       "has_perm": false,
@@ -304,6 +310,30 @@
       "method": "POST",
       "path": "/api/v1/tenants/{tenant_id}/bills/{bill_id}/settle",
       "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/blacklist",
+      "has_perm": true,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/blacklist",
+      "has_perm": true,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/blacklist/check",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/tenants/{tenant_id}/blacklist/{black_id}",
+      "has_perm": true,
       "is_write": true
     },
     {
@@ -361,6 +391,12 @@
       "is_write": true
     },
     {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/bookings/{booking_id}/deposits",
+      "has_perm": true,
+      "is_write": false
+    },
+    {
       "method": "POST",
       "path": "/api/v1/tenants/{tenant_id}/bookings/{booking_id}/extend-stay",
       "has_perm": false,
@@ -381,6 +417,42 @@
     {
       "method": "POST",
       "path": "/api/v1/tenants/{tenant_id}/bookings/{booking_id}/noshow",
+      "has_perm": true,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/bookings/{booking_id}/room-changes",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/bookings/{booking_id}/stay-extensions",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/breakfast-tickets",
+      "has_perm": true,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/breakfast-tickets/issue",
+      "has_perm": true,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/breakfast-tickets/use",
+      "has_perm": true,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/breakfast-tickets/{ticket_id}/void",
       "has_perm": true,
       "is_write": true
     },
@@ -434,9 +506,99 @@
     },
     {
       "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/coupon-templates",
+      "has_perm": true,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/coupon-templates",
+      "has_perm": true,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/coupons",
+      "has_perm": true,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/coupons",
+      "has_perm": true,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/coupons/use",
+      "has_perm": true,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/coupons/{coupon_id}/void",
+      "has_perm": true,
+      "is_write": true
+    },
+    {
+      "method": "GET",
       "path": "/api/v1/tenants/{tenant_id}/daily-reports",
       "has_perm": false,
       "is_write": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/deposits",
+      "has_perm": true,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/deposits",
+      "has_perm": true,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/deposits/auto-release",
+      "has_perm": true,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/deposits/{deposit_id}",
+      "has_perm": true,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/deposits/{deposit_id}/apply",
+      "has_perm": true,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/deposits/{deposit_id}/capture",
+      "has_perm": true,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/deposits/{deposit_id}/refund",
+      "has_perm": true,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/deposits/{deposit_id}/release",
+      "has_perm": true,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/deposits/{deposit_id}/void",
+      "has_perm": true,
+      "is_write": true
     },
     {
       "method": "GET",
@@ -667,6 +829,12 @@
       "is_write": true
     },
     {
+      "method": "PATCH",
+      "path": "/api/v1/tenants/{tenant_id}/hotels/{hotel_id}/settings",
+      "has_perm": true,
+      "is_write": true
+    },
+    {
       "method": "GET",
       "path": "/api/v1/tenants/{tenant_id}/housekeeping-tasks",
       "has_perm": false,
@@ -706,6 +874,30 @@
       "method": "POST",
       "path": "/api/v1/tenants/{tenant_id}/housekeeping-tasks/{task_id}/inspect",
       "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/invoices",
+      "has_perm": true,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/invoices",
+      "has_perm": true,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/invoices/{invoice_id}",
+      "has_perm": true,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/invoices/{invoice_id}/void",
+      "has_perm": true,
       "is_write": true
     },
     {
@@ -913,9 +1105,57 @@
       "is_write": true
     },
     {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/ota/mappings",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/ota/mappings",
+      "has_perm": true,
+      "is_write": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/tenants/{tenant_id}/ota/mappings/{mapping_id}",
+      "has_perm": true,
+      "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/ota/push-logs",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/ota/rate-plans",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/ota/rate-plans",
+      "has_perm": true,
+      "is_write": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/tenants/{tenant_id}/ota/rate-plans/{plan_id}",
+      "has_perm": true,
+      "is_write": true
+    },
+    {
       "method": "POST",
       "path": "/api/v1/tenants/{tenant_id}/ota/{channel}/inventory/push",
       "has_perm": false,
+      "is_write": true
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/ota/{channel}/rates/push",
+      "has_perm": true,
       "is_write": true
     },
     {
@@ -1028,6 +1268,18 @@
     },
     {
       "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/room-attributes",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/room-changes",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "GET",
       "path": "/api/v1/tenants/{tenant_id}/room-types",
       "has_perm": false,
       "is_write": false
@@ -1057,6 +1309,18 @@
       "is_write": false
     },
     {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/rooms/{room_id}/attributes",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/tenants/{tenant_id}/rooms/{room_id}/attributes",
+      "has_perm": false,
+      "is_write": true
+    },
+    {
       "method": "POST",
       "path": "/api/v1/tenants/{tenant_id}/rooms/{room_no}/dnd",
       "has_perm": false,
@@ -1076,6 +1340,18 @@
     },
     {
       "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/search",
+      "has_perm": false,
+      "is_write": false
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/tenants/{tenant_id}/settings",
+      "has_perm": true,
+      "is_write": true
+    },
+    {
+      "method": "GET",
       "path": "/api/v1/tenants/{tenant_id}/shifts",
       "has_perm": false,
       "is_write": false
@@ -1091,6 +1367,12 @@
       "path": "/api/v1/tenants/{tenant_id}/shifts/{shift_id}/close",
       "has_perm": false,
       "is_write": true
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/stay-extensions",
+      "has_perm": false,
+      "is_write": false
     },
     {
       "method": "GET",
@@ -1173,12 +1455,6 @@
     {
       "method": "PUT",
       "path": "/api/v1/tenants/{tenant_id}/yield/rules",
-      "has_perm": false,
-      "is_write": true
-    },
-    {
-      "method": "PUT",
-      "path": "/api/v1/tenants/{tenant_id}/rooms/{room_id}/attributes",
       "has_perm": false,
       "is_write": true
     }
