@@ -345,6 +345,8 @@ from app.services.permissions import (
     MEMBER_MANAGE,
     SHIFT_MANAGE,
     BOOKING_MANAGE,
+    HOTEL_MANAGE,
+    ROOM_MANAGE,
 )
 from app.services.pay_service import (
     PayNotifySignatureError,
@@ -592,6 +594,7 @@ async def update_tenant_settings(
     "/tenants/{tenant_id}/hotels",
     response_model=HotelOut,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Security(require_perm, scopes=[HOTEL_MANAGE])],
 )
 async def create_hotel(
     tenant_id: str, body: HotelCreate, session: AsyncSession = Depends(get_session)
@@ -656,6 +659,7 @@ async def update_hotel_settings(
     "/tenants/{tenant_id}/room-types",
     response_model=RoomTypeOut,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Security(require_perm, scopes=[ROOM_MANAGE])],
 )
 async def create_room_type(
     tenant_id: str, body: RoomTypeCreate, session: AsyncSession = Depends(get_session)
@@ -3393,6 +3397,7 @@ async def update_notification_subscriptions(
     "/tenants/{tenant_id}/group/price-policies",
     response_model=GroupPricePolicyOut,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Security(require_perm, scopes=[RATE_EDIT])],
 )
 async def create_group_price_policy(
     tenant_id: str, body: GroupPricePolicyIn, session: AsyncSession = Depends(get_session)
@@ -4042,6 +4047,7 @@ async def get_yield_rule(
 @router.put(
     "/tenants/{tenant_id}/yield/rules",
     response_model=PricingRuleOut,
+    dependencies=[Security(require_perm, scopes=[RATE_EDIT])],
 )
 async def update_yield_rule(
     tenant_id: str,
@@ -6246,6 +6252,7 @@ async def list_room_attributes(
 @router.put(
     "/tenants/{tenant_id}/rooms/{room_id}/attributes",
     response_model=list[RoomAttributeOut],
+    dependencies=[Security(require_perm, scopes=[ROOM_MANAGE])],
 )
 async def replace_room_attributes(
     tenant_id: str,

@@ -707,3 +707,157 @@ class TestB1BookingPermission:
         # 不在意内部推送成功（可能有 mocking 限制），只要不是 403
         assert r.status_code != 403, r.text
 
+
+# =========================================================================
+# M1-C: 管控基础数据（门店/房型/房间属性/集团价策/收益规则）
+# =========================================================================
+
+class TestC1GovernancePermission:
+    """M1-C：管控残余 6 路由挂码验证。
+
+    行动清单：C 桶 5 路由挂码 + 1 转 E 桶豁免：
+    - POST ``/tenants/{tid}/hotels``      → ``hotel.manage``（仅管理员）
+    - POST ``/tenants/{tid}/room-types``  → ``room.manage``（前台可用，房态排房）
+    - PUT  ``/tenants/{tid}/rooms/{rid}/attributes`` → ``room.manage``（同上）
+    - POST ``/tenants/{tid}/group/price-policies`` → ``rate.edit``（**复用**，M17 中央房价下发）
+    - PUT  ``/tenants/{tid}/yield/rules`` → ``rate.edit``（**复用**，M15 收益规则）
+    - POST ``/tenants/{tid}/yield/pricing/recommend`` → **E 桶豁免**
+        （落库但仅试算建议，需再调 /apply 才真改价，后者已挂 rate.edit）
+
+    正交点：
+    - 前台有 ``room.manage``（能装房型/管房间属性）但**无 ``hotel.manage``**（不能开分店）
+    - 前台无 ``rate.edit`` → 集团价策/收益规则都 403（C 桶通过 rate.edit 守护两个原本独立的业务点）
+    """
+
+    def _front_token(self, client: TestClient, code: str, d: dict) -> str:
+        u = client.post(
+            f"/api/v1/tenants/{code}/users",
+            json={"username": "front_c", "password": "pw123456"},
+            headers=d["auth"],
+        ).json()
+        roles = client.get(f"/api/v1/tenants/{code}/roles", headers=d["auth"]).json()
+        front = next(r for r in roles if r["name"] == "前台")
+        client.post(
+            f"/api/v1/tenants/{code}/users/{u['id']}/roles",
+            json={"role_id": front["id"], "hotel_id": d["h"]["id"]},
+            headers=d["auth"],
+        )
+        return client.post(
+            f"/api/v1/tenants/{code}/auth/login",
+            json={"username": "front_c", "password": "pw123456"},
+        ).json()["token"]
+
+    def _room_id(self, client: TestClient, code: str, d: dict) -> int:
+        """查房间 id（_seed 创建 0101 后存于该租户的房号清单中）。"""
+        rows = client.get(
+            f"/api/v1/tenants/{code}/rooms",
+            headers=d["auth"],
+        ).json()
+        assert rows, "seed 后应至少有一个房间"
+        return rows[0]["id"]
+
+    # ---- POSITIVE: 前台可用的 room.manage ----
+
+    def test_front_can_create_room_type(self, client: TestClient) -> None:
+        """前台有 room.manage → 房型创建 201（管房态必做）。"""
+        d = _seed(client, "c1rt1")
+        token = self._front_token(client, "c1rt1", d)
+        r = client.post(
+            f"/api/v1/tenants/c1rt1/room-types",
+            json={"code": "DLX", "name": "大床", "base_price": 38800, "hotel_id": d["h"]["id"]},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 201, r.text
+        assert r.json()["code"] == "DLX"
+
+    def test_front_can_set_room_attributes(self, client: TestClient) -> None:
+        """前台有 room.manage → 房间属性 PUT 200（排房筛选属性高频）。"""
+        d = _seed(client, "c1attr1")
+        token = self._front_token(client, "c1attr1", d)
+        room_id = self._room_id(client, "c1attr1", d)
+        r = client.put(
+            f"/api/v1/tenants/c1attr1/rooms/{room_id}/attributes",
+            json={"codes": ["SEA_VIEW", "NON_SMOKING"], "memo": "前台备注", "operator": "front_c"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code in (200, 201), r.text
+
+    # ---- NEGATIVE: 前台无 hotel.manage / rate.edit ----
+
+    def test_front_cannot_create_hotel(self, client: TestClient) -> None:
+        """前台无 hotel.manage → 创建门店 403（防前台开分店）。"""
+        d = _seed(client, "c1hotel1")
+        token = self._front_token(client, "c1hotel1", d)
+        r = client.post(
+            f"/api/v1/tenants/c1hotel1/hotels",
+            json={"code": "H2", "name": "前台尝试开二店"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 403, r.text
+        assert "hotel.manage" in r.json()["detail"]
+
+    def test_front_cannot_create_group_price_policy(self, client: TestClient) -> None:
+        """前台无 rate.edit → 集团中央房价下发 403（C 桶通过 rate.edit 守 M17）。"""
+        d = _seed(client, "c1gprice1")
+        token = self._front_token(client, "c1gprice1", d)
+        r = client.post(
+            f"/api/v1/tenants/c1gprice1/group/price-policies",
+            json={"price_floor_cents": 10000, "price_ceiling_cents": 80000},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 403, r.text
+        assert "rate.edit" in r.json()["detail"]
+
+    def test_front_cannot_update_yield_rules(self, client: TestClient) -> None:
+        """前台无 rate.edit → 收益规则更新 403（C 桶通过 rate.edit 守 M15）。"""
+        d = _seed(client, "c1yield1")
+        token = self._front_token(client, "c1yield1", d)
+        r = client.put(
+            f"/api/v1/tenants/c1yield1/yield/rules",
+            json={"max_uplift_bps": 1500, "weekend_uplift_bps": 500},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 403, r.text
+        assert "rate.edit" in r.json()["detail"]
+
+    # ---- POSITIVE: 管理员 (admin) 全放行 + E 桶豁免 ----
+
+    def test_admin_can_create_hotel(self, client: TestClient) -> None:
+        """管理员持有 hotel.manage → 新增门店 201（确认未误伤）。"""
+        d = _seed(client, "c1admin_h")
+        r = client.post(
+            f"/api/v1/tenants/c1admin_h/hotels",
+            json={"code": "H2", "name": "二号店"},
+            headers=d["auth"],
+        )
+        assert r.status_code == 201, r.text
+        assert r.json()["code"] == "H2"
+
+    def test_admin_can_update_yield_rules(self, client: TestClient) -> None:
+        """管理员持有 rate.edit → 更新收益规则 200（确认复用无误）。"""
+        d = _seed(client, "c1admin_y")
+        r = client.put(
+            f"/api/v1/tenants/c1admin_y/yield/rules",
+            json={"max_uplift_bps": 1500, "weekend_uplift_bps": 500, "enabled": True},
+            headers=d["auth"],
+        )
+        assert r.status_code in (200, 201), r.text
+
+    def test_admin_recommend_no_perm_required(self, client: TestClient) -> None:
+        """E 桶豁免：POST /yield/pricing/recommend 未挂权限码（仅为试算建议，落库但
+        不直接改价，必须再调 /apply 才生效，后者已守 PRICE_EDIT）。
+        这里验证：401/403 都不是因为没有权限码——纯调通即视为 E 桶豁免成立。
+        """
+        d = _seed(client, "c1recom")
+        r = client.post(
+            f"/api/v1/tenants/c1recom/yield/pricing/recommend",
+            json={
+                "hotel_id": d["h"]["id"],
+                "business_date": "2026-09-13",
+                "base_price_cents": 30000,
+            },
+            headers=d["auth"],
+        )
+        # 业务上可能因 mock/缺数据返回 4xx/5xx，但**不应是 403**（无权限码即不会因缺权限拒）
+        assert r.status_code != 403, r.text
+

@@ -38,6 +38,9 @@ MEMBER_MANAGE = "member.manage"        # 会员 建档/充值（充值=现金入
 SHIFT_MANAGE = "shift.manage"          # 开班/交班（仅管理员 + 门店经理）
 # M1-B 库存价格：预订/入住/换房/续住/团队（与 BOOKING_CANCEL 正交：能登记 ≠ 能取消）
 BOOKING_MANAGE = "booking.manage"      # 预订建单/关联/换房/续住/加项/入离/团队块管理/前台高级操作
+# M1-C 管控基础数据：门店/房型/房间属性
+HOTEL_MANAGE = "hotel.manage"           # 门店开通（仅管理员启用，门店内增删门店属平台级操作）
+ROOM_MANAGE = "room.manage"             # 房型与房间属性管理（前台可用：管房态排房）
 
 ALL_PERMISSIONS = {
     PRICE_EDIT,
@@ -63,6 +66,8 @@ ALL_PERMISSIONS = {
     MEMBER_MANAGE,
     SHIFT_MANAGE,
     BOOKING_MANAGE,
+    HOTEL_MANAGE,
+    ROOM_MANAGE,
 }
 
 
@@ -124,6 +129,9 @@ DEFAULT_ROLES: list[tuple[str, str, bool, list[str]]] = [
             # M1-B：前台要办入住/换房/续住/加项/团队登记，故授予 booking.manage；
             # 但不含 booking.cancel（已在原有 BOOKING_CANCEL，单独守门）、bills 敏感账务
             BOOKING_MANAGE,
+            # M1-C：房型与房间属性是前台日常操作，故授予 room.manage；
+            # 不含 hotel.manage（开分店 = 平台级，仅管理员）—— MANAGER_ONLY_PERMISSIONS 集合控制
+            ROOM_MANAGE,
         ],
     ),
 ]

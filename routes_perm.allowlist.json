@@ -1,9 +1,9 @@
 {
-  "generated_at": "2026-09-13T13:06:52+00:00",
+  "generated_at": "2026-09-13T13:56:31+00:00",
   "total_routes": 242,
-  "protected_count": 109,
-  "unprotected_count": 133,
-  "unprotected_writes_count": 48,
+  "protected_count": 114,
+  "unprotected_count": 128,
+  "unprotected_writes_count": 43,
   "unprotected_reads_count": 85,
   "items": [
     {
@@ -777,7 +777,7 @@
     {
       "method": "POST",
       "path": "/api/v1/tenants/{tenant_id}/group/price-policies",
-      "has_perm": false,
+      "has_perm": true,
       "is_write": true
     },
     {
@@ -825,7 +825,7 @@
     {
       "method": "POST",
       "path": "/api/v1/tenants/{tenant_id}/hotels",
-      "has_perm": false,
+      "has_perm": true,
       "is_write": true
     },
     {
@@ -1287,7 +1287,7 @@
     {
       "method": "POST",
       "path": "/api/v1/tenants/{tenant_id}/room-types",
-      "has_perm": false,
+      "has_perm": true,
       "is_write": true
     },
     {
@@ -1317,7 +1317,7 @@
     {
       "method": "PUT",
       "path": "/api/v1/tenants/{tenant_id}/rooms/{room_id}/attributes",
-      "has_perm": false,
+      "has_perm": true,
       "is_write": true
     },
     {
@@ -1455,7 +1455,7 @@
     {
       "method": "PUT",
       "path": "/api/v1/tenants/{tenant_id}/yield/rules",
-      "has_perm": false,
+      "has_perm": true,
       "is_write": true
     }
   ]
