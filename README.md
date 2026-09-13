@@ -545,7 +545,8 @@ python -m venv .venv
 ### 机制
 - `app/api/routes.py::require_auth`：路由级依赖，解析 `Authorization: Bearer <token>` → `RbacService.get_session()` 校验；缺失 / 伪造 / 过期均返回 `401`。
 - 挂载方式：`app/main.py` 通过 `app.include_router(api_router, prefix=settings.api_v1_prefix, dependencies=[Depends(require_auth)])` 应用到除公开端点外的所有路由。
-- **公开白名单**（无需会话）：`POST /tenants`（租户开通）、`GET /tenants`（租户目录，登录页切换器在未登录时可用）、`POST .../auth/login|logout|check`、`/tenants/{code}/openapi/...`（开放平台采用 API-Key 独立鉴权）。
+- **公开白名单**（无需会话）：`POST /tenants`（租户开通）、`GET /tenants`（租户目录，登录页切换器在未登录时可用）、`POST .../auth/login|logout|check`、`/tenants/{code}/openapi/v1/...`（开放平台**只读**接口，API-Key 独立鉴权）、`POST .../openapi/verify-key`（Key 校验端点）、`/tenants/{code}/ota/{channel}/webhook/...`（HMAC 签名鉴权）。
+  - ⚠️ **开放平台管理类写操作不白名单**：注册应用 / 签发密钥 / 吊销密钥 / 注册 webhook / 触发测试，均需**登录会话 + `user.manage`**（仅管理员）。此前 `/openapi/` 整体白名单导致这些操作免登录且零鉴权（P0，已修）。
 
 ### 引导账号（让强制鉴权真正可用）
 - `RbacService.seed_default_admin()`：`admin / admin123`，**幂等**（已存在则跳过），并绑定 `ADMIN` 角色（完整 9 项权限）。
@@ -581,7 +582,9 @@ python -m venv .venv
 | 登录 admin/admin123 → token + 9 权限 | ✅ |
 | 带有效 token → 200 | ✅ |
 | 伪造/过期 token → 401 | ✅ |
-| openapi 白名单无 token → 200 | ✅ `GET .../openapi/apps` |
+| openapi 只读接口无 token → 200（带无效 Key 则 401） | ✅ `GET .../openapi/v1/hotels` |
+| **openapi 管理类写操作无 token → 401** | ✅ `POST .../openapi/apps` |
+| **openapi 管理类写操作（前台 token）→ 403** | ✅ 需 `user.manage` |
 | 新建租户自动播种 admin 并可登录 | ✅ `PMSNEW01` |
 | 前端 `npm run build`（tsc + vite） | ✅ 3130 模块 |
 | 无权限用户访问 audit-logs（缺 audit.view）→ 403 | ✅ `newuser` 实测 403 |

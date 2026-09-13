@@ -1,9 +1,9 @@
 {
-  "generated_at": "2026-09-12T12:22:16+00:00",
+  "generated_at": "2026-09-13T01:25:44+00:00",
   "total_routes": 242,
-  "protected_count": 65,
-  "unprotected_count": 177,
-  "unprotected_writes_count": 89,
+  "protected_count": 70,
+  "unprotected_count": 172,
+  "unprotected_writes_count": 84,
   "unprotected_reads_count": 88,
   "items": [
     {
@@ -1017,7 +1017,7 @@
     {
       "method": "POST",
       "path": "/api/v1/tenants/{tenant_id}/openapi/apps",
-      "has_perm": false,
+      "has_perm": true,
       "is_write": true
     },
     {
@@ -1029,13 +1029,13 @@
     {
       "method": "POST",
       "path": "/api/v1/tenants/{tenant_id}/openapi/apps/{app_id}/keys",
-      "has_perm": false,
+      "has_perm": true,
       "is_write": true
     },
     {
       "method": "POST",
       "path": "/api/v1/tenants/{tenant_id}/openapi/apps/{app_id}/keys/{key_id}/revoke",
-      "has_perm": false,
+      "has_perm": true,
       "is_write": true
     },
     {
@@ -1083,13 +1083,13 @@
     {
       "method": "POST",
       "path": "/api/v1/tenants/{tenant_id}/openapi/webhooks",
-      "has_perm": false,
+      "has_perm": true,
       "is_write": true
     },
     {
       "method": "POST",
       "path": "/api/v1/tenants/{tenant_id}/openapi/webhooks/{subscription_id}/test",
-      "has_perm": false,
+      "has_perm": true,
       "is_write": true
     },
     {

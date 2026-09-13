@@ -410,8 +410,14 @@ async def require_auth(
       - ``POST /tenants`` 租户开通
       - ``GET  /tenants`` 租户目录（登录页租户切换器，未登录可用）
       - ``POST /tenants/{code}/auth/login|logout|check`` 登录/登出/鉴权校验
-      - ``/tenants/{code}/openapi/...`` 开放平台（采用 API-Key 独立鉴权）
+      - ``/tenants/{code}/openapi/v1/...`` 开放平台**只读**接口（API-Key 独立鉴权）
+      - ``POST /tenants/{code}/openapi/verify-key`` 同上（校验端点本身）
+      - ``/tenants/{code}/ota/{channel}/webhook/...`` OTA 回调（HMAC 签名鉴权）
     其余端点必须携带 ``Authorization: Bearer <token>`` 且会话有效，否则返回 401。
+
+    ⚠️ 安全边界：``/openapi/`` **只放行 /openapi/v1/ 只读接口与 verify-key**，
+    **不放行应用注册 / 签发密钥 / 注册 webhook 等管理类写操作**——它们必须走
+    登录会话 + ``require_perm(user.manage)``，仅管理员可操作。
     """
     path = request.url.path
     prefix = get_settings().api_v1_prefix
@@ -424,7 +430,10 @@ async def require_auth(
         return None
     if path.rstrip("/") == f"{prefix}/tenants":
         return None
-    if "/openapi/" in path:
+    # 开放平台：仅放行「第三方只读接口」与「Key 校验端点」。
+    # 注意用 "/openapi/v1/" 精确前缀，不能用 "/openapi/"——后者会把
+    # 应用注册 / 签发密钥 / 注册 webhook 一并放行为免登录（P0 安全缺口）。
+    if "/openapi/v1/" in path or path.endswith("/openapi/verify-key"):
         return None
     if "/ota/" in path and "/webhook/" in path:
         return None  # M29：OTA webhook 走 HMAC 签名校验，不走会话鉴权
@@ -3646,6 +3655,7 @@ def _analytics_csv_response(report_type: str, data: dict) -> dict:
     "/tenants/{tenant_id}/openapi/apps",
     response_model=OpenApiAppOut,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Security(require_perm, scopes=[USER_MANAGE])],
 )
 async def register_openapi_app(
     tenant_id: str, body: OpenApiAppCreate, session: AsyncSession = Depends(get_session)
@@ -3678,6 +3688,7 @@ async def list_openapi_apps(
     "/tenants/{tenant_id}/openapi/apps/{app_id}/keys",
     response_model=OpenApiKeyWithSecret,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Security(require_perm, scopes=[USER_MANAGE])],
 )
 async def create_openapi_key(
     tenant_id: str,
@@ -3709,6 +3720,7 @@ async def list_openapi_keys(
 @router.post(
     "/tenants/{tenant_id}/openapi/apps/{app_id}/keys/{key_id}/revoke",
     response_model=OpenApiKeyOut,
+    dependencies=[Security(require_perm, scopes=[USER_MANAGE])],
 )
 async def revoke_openapi_key(
     tenant_id: str,
@@ -3748,6 +3760,7 @@ async def verify_openapi_key(
     "/tenants/{tenant_id}/openapi/webhooks",
     response_model=OpenApiWebhookOut,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Security(require_perm, scopes=[USER_MANAGE])],
 )
 async def create_openapi_webhook(
     tenant_id: str, body: OpenApiWebhookIn, session: AsyncSession = Depends(get_session)
@@ -3784,6 +3797,7 @@ async def list_openapi_webhooks(
 @router.post(
     "/tenants/{tenant_id}/openapi/webhooks/{subscription_id}/test",
     response_model=OpenApiWebhookTestOut,
+    dependencies=[Security(require_perm, scopes=[USER_MANAGE])],
 )
 async def test_openapi_webhook(
     tenant_id: str,

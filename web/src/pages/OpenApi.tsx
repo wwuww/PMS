@@ -22,6 +22,7 @@ import {
   ThunderboltOutlined,
 } from "@ant-design/icons";
 import { useTenant } from "../store/tenant";
+import { PERM, useCan } from "../utils/permission";
 import {
   listOpenApiApps,
   registerOpenApiApp,
@@ -44,6 +45,9 @@ const { Title, Text, Paragraph } = Typography;
 
 export default function OpenApi() {
   const { tenantCode } = useTenant();
+  // 门控：开放平台管理（注册应用 / 签发密钥 / 注册 Webhook）仅管理员（user.manage）。
+  // 后端这 5 个写操作已要求 user.manage，此处同步隐藏入口，避免"点了报 403"。
+  const canManage = useCan(PERM.USER_MANAGE);
   const [apps, setApps] = useState<OpenApiApp[]>([]);
   const [loading, setLoading] = useState(false);
   const [showApp, setShowApp] = useState(false);
@@ -187,16 +191,19 @@ export default function OpenApi() {
     {
       title: "操作",
       width: 180,
-      render: (_: unknown, r: OpenApiApp) => (
-        <Space>
-          <Button size="small" icon={<KeyOutlined />} onClick={() => openKeys(r)}>
-            密钥
-          </Button>
-          <Button size="small" icon={<LinkOutlined />} onClick={() => openHooks(r)}>
-            Webhook
-          </Button>
-        </Space>
-      ),
+      render: (_: unknown, r: OpenApiApp) =>
+        canManage ? (
+          <Space>
+            <Button size="small" icon={<KeyOutlined />} onClick={() => openKeys(r)}>
+              密钥
+            </Button>
+            <Button size="small" icon={<LinkOutlined />} onClick={() => openHooks(r)}>
+              Webhook
+            </Button>
+          </Space>
+        ) : (
+          <Text type="secondary">仅管理员可管理</Text>
+        ),
     },
   ];
 
@@ -210,6 +217,8 @@ export default function OpenApi() {
           type="primary"
           icon={<PlusOutlined />}
           onClick={() => setShowApp(true)}
+          disabled={!canManage}
+          title={canManage ? undefined : "仅管理员可注册应用"}
         >
           注册应用
         </Button>
@@ -275,6 +284,7 @@ export default function OpenApi() {
             type="primary"
             icon={<KeyOutlined />}
             onClick={handleCreateKey}
+            disabled={!canManage}
           >
             生成新密钥
           </Button>
@@ -314,7 +324,7 @@ export default function OpenApi() {
                   <Button
                     size="small"
                     danger
-                    disabled={r.status !== "active"}
+                    disabled={r.status !== "active" || !canManage}
                     onClick={() => keyApp && handleRevoke(keyApp.id, r.id)}
                   >
                     吊销
