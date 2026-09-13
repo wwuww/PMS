@@ -41,16 +41,30 @@ async def s_ensure(sm):
         yield s
 
 
-
 @pytest.fixture
-async def tenant_and_hotel():
+async def tenant_and_hotel(tmp_path, monkeypatch):
     """最小可用的租户+酒店+房型+房间 fixture（幂等：先查后建）。
 
     返回 (tenant_id_str, hotel_id, pms_room_type_id) —— tenant_id 走字符串形态
     （TenantMixin.tenant_id 是 String(32) 列，避免与 BigInteger id 混淆）。
+
+    ⚠️ 本文件用 ``AsyncClient``（非 conftest 的 ``client`` fixture），必须在
+    本 fixture 内自行完成 DB 隔离：把 ``PMS_DATABASE_URL`` 指向 tmp_path 独立库
+    并 ``reset_engine()``。否则会连上真实 ``pms_dev.db``，断言依赖脏数据
+    （历史遗留问题：曾因跨门店同名房型命中错行导致 push 推送空库存）。
     """
     from sqlalchemy import select
     from sqlalchemy.ext.asyncio import async_sessionmaker
+
+    from app.core.config import get_settings
+    from app.db import session as db_session
+
+    monkeypatch.setenv("PMS_DATABASE_URL", f"sqlite+aiosqlite:///{tmp_path}/ota.db")
+    get_settings.cache_clear()
+    db_session.reset_engine()
+
+    await init_db()  # 独立空库需先建表
+
     sm = async_sessionmaker(get_engine(), expire_on_commit=False)
     async with sm() as s:
         t = (
@@ -60,6 +74,13 @@ async def tenant_and_hotel():
             t = Tenant(code="T29", name="M29 Tenant")
             s.add(t)
             await s.flush()
+        # 直接经 ORM 建租户不会触发「开通流程」，必须显式播种默认三档角色，
+        # 否则 conftest 的 auth_bypass 会创建一个「无角色绑定」的 admin → 所有
+        # 需要权限点的接口 403（独立库下必现；旧版因共用 pms_dev.db 而侥幸通过）。
+        from app.services.rbac_service import RbacService
+
+        await RbacService(s).seed_default_roles(str(t.id))
+        await s.flush()
         h = (
             await s.execute(
                 select(Hotel).where(Hotel.tenant_id == t.id, Hotel.code == "H29")
@@ -72,13 +93,21 @@ async def tenant_and_hotel():
         rt = (
             await s.execute(
                 select(RoomType).where(
-                    RoomType.tenant_id == t.id, RoomType.code == "STD29"
+                    # D1（M0 多店）：房型按门店唯一，查找必须带 hotel_id，
+                    # 否则会命中别的门店的同名房型（曾导致 push 推送空库存）。
+                    RoomType.tenant_id == t.id,
+                    RoomType.hotel_id == h.id,
+                    RoomType.code == "STD29",
                 )
             )
         ).scalar_one_or_none()
         if rt is None:
             rt = RoomType(
-                tenant_id=t.id, code="STD29", name="标准间M29", base_price=30000
+                tenant_id=t.id,
+                hotel_id=h.id,  # D1（M0 多店）：房型必须归属门店
+                code="STD29",
+                name="标准间M29",
+                base_price=30000,
             )
             s.add(rt)
             await s.flush()
@@ -336,7 +365,7 @@ async def test_push_inventory_writes_log(tenant_and_hotel, client):
     assert r.status_code == 200, r.text
     ack = r.json()
     assert ack["dry_run"] is True
-    # 找我们映射的 STD29（dev 库已有 STD 等其他房型）
+    # 找我们映射的 STD29（独立库仅本用例种子）
     item = next(i for i in ack["items"] if i["pms_room_type_id"] == rtid)
     assert item["external_room_type_code"] == "STD-X"
     assert item["pms_room_type_code"] == "STD29"

@@ -286,23 +286,28 @@ class TestNightAuditBoard:
         t = client.post("/api/v1/tenants", json={"code": "nab", "name": "看板测试"}).json()
         h1 = self._seed_hotel(client, t, "H1", "店一")
         h2 = self._seed_hotel(client, t, "H2", "店二")
-        rt = client.post(
+        # D1（M0 多店）：房型归属门店 —— 两店各建一个同名 STD 房型（门店级唯一）
+        rt1 = client.post(
             f"/api/v1/tenants/{t['id']}/room-types",
-            json={"code": "STD", "name": "标间", "base_price": 30000},
+            json={"code": "STD", "name": "标间", "base_price": 30000, "hotel_id": h1["id"]},
+        ).json()
+        rt2 = client.post(
+            f"/api/v1/tenants/{t['id']}/room-types",
+            json={"code": "STD", "name": "标间", "base_price": 30000, "hotel_id": h2["id"]},
         ).json()
         # 注意：Room 唯一约束为 (tenant_id, room_no)，同一租户下两店须用不同房号
-        client.post(f"/api/v1/hotels/{h1['id']}/rooms", json=[{"room_type_id": rt["id"], "room_no": "0101"}])
-        client.post(f"/api/v1/hotels/{h2['id']}/rooms", json=[{"room_type_id": rt["id"], "room_no": "0201"}])
+        client.post(f"/api/v1/hotels/{h1['id']}/rooms", json=[{"room_type_id": rt1["id"], "room_no": "0101"}])
+        client.post(f"/api/v1/hotels/{h2['id']}/rooms", json=[{"room_type_id": rt2["id"], "room_no": "0201"}])
 
-        for hid, phone, rno in (
-            (h1["id"], "13700000021", "0101"),
-            (h2["id"], "13700000022", "0201"),
+        for hid, rtid, phone, rno in (
+            (h1["id"], rt1["id"], "13700000021", "0101"),
+            (h2["id"], rt2["id"], "13700000022", "0201"),
         ):
             bk = client.post(
                 f"/api/v1/tenants/{t['code']}/bookings",
                 json={
                     "hotel_id": hid,
-                    "room_type_id": rt["id"],
+                    "room_type_id": rtid,
                     "guest_name": "G",
                     "guest_phone": phone,
                     "check_in_date": "2026-10-01",

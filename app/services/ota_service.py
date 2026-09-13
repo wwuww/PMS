@@ -164,8 +164,12 @@ class OtaService:
 
         hotel_id = payload.get("hotel_id") or cfg.hotel_id
         room_type_code = payload.get("room_type_code")
+        # D1（M0 多店）：房型 code 现在仅在门店内唯一，两店可各建同名房型，
+        # 必须同店匹配，否则可能命中别的门店的同名房型。
         stmt = select(RoomType).where(
-            RoomType.tenant_id == tenant_id, RoomType.code == str(room_type_code)
+            RoomType.tenant_id == tenant_id,
+            RoomType.hotel_id == hotel_id,
+            RoomType.code == str(room_type_code),
         )
         rt = (await self.session.execute(stmt)).scalar_one_or_none()
         if rt is None:
@@ -237,7 +241,12 @@ class OtaService:
         ).scalar_one()
         rt_rows = (
             await self.session.execute(
-                select(RoomType).where(RoomType.tenant_id == tenant_id)
+                select(RoomType).where(
+                    RoomType.tenant_id == tenant_id,
+                    # D1（M0 多店）：本函数按 cfg.hotel_id 推送该门店库存，
+                    # 房型必须同店过滤，否则会推别的门店的房型。
+                    RoomType.hotel_id == hotel_id,
+                )
             )
         ).scalars()
         mapping_svc = OtaMappingService(self.session)
@@ -247,7 +256,11 @@ class OtaService:
                 await self.session.execute(
                     select(func.count())
                     .select_from(Room)
-                    .where(Room.tenant_id == tenant_id, Room.room_type_id == rt.id)
+                    .where(
+                        Room.tenant_id == tenant_id,
+                        Room.room_type_id == rt.id,
+                        Room.hotel_id == hotel_id,  # D1：门店隔离
+                    )
                 )
             ).scalar_one()
             ext_code = await mapping_svc.resolve_external_code(
@@ -323,7 +336,10 @@ class OtaService:
         rate_svc = OtaRatePlanService(self.session)
         rt_rows = (
             await self.session.execute(
-                select(RoomType).where(RoomType.tenant_id == tenant_id)
+                select(RoomType).where(
+                    RoomType.tenant_id == tenant_id,
+                    RoomType.hotel_id == hotel_id,  # D1：按本门店房型推价
+                )
             )
         ).scalars()
         items: list[dict[str, Any]] = []

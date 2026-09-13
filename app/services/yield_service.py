@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import DailyReport, PriceRecommendation, PricingRule
+from app.models import DailyReport, PriceRecommendation, PricingRule, RoomType
 from app.services.notification_service import NotificationService
 
 # 周末（周五/周六）视为高峰日
@@ -279,6 +279,11 @@ class YieldService:
             )
             raise
 
+        # D1（M0 多店）：价格覆盖归属门店，由房型推导（保证与房型同店）
+        rec_rt = await self.session.get(RoomType, rec.room_type_id)
+        if rec_rt is None:
+            raise ValueError("room_type 不存在")
+
         updated = 0
         for date in dates:
             existing = await self.session.execute(
@@ -296,6 +301,7 @@ class YieldService:
                 self.session.add(
                     PriceCalendar(
                         tenant_id=tenant_id,
+                        hotel_id=rec_rt.hotel_id,  # D1
                         room_type_id=rec.room_type_id,
                         date=date,
                         price=rec.recommended_price_cents,

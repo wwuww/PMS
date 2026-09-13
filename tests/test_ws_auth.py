@@ -40,12 +40,13 @@ def test_ws_tenant_isolation(client: TestClient) -> None:
     with client.websocket_connect(f"/ws/rooms?tenant_id=t-ws2&token={token}") as ws:
         assert ws.receive_json()["type"] == "subscribed"
         # 在另一租户流转房态（触发 RoomStateChanged 事件）
-        rt = client.post(
-            f"/api/v1/tenants/{other['id']}/room-types",
-            json={"code": "W3", "name": "隔离房型", "base_price": 10000},
-        ).json()
+        # D1（M0 多店）：先建门店，房型显式归属门店
         hotel = client.post(
             f"/api/v1/tenants/{other['id']}/hotels", json={"code": "W3H", "name": "隔离店"}
+        ).json()
+        rt = client.post(
+            f"/api/v1/tenants/{other['id']}/room-types",
+            json={"code": "W3", "name": "隔离房型", "base_price": 10000, "hotel_id": hotel["id"]},
         ).json()
         client.post(
             f"/api/v1/hotels/{hotel['id']}/rooms",

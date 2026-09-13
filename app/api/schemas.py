@@ -67,6 +67,8 @@ class HotelUpdate(BaseModel):
 class RoomTypeCreate(BaseModel):
     code: str
     name: str
+    # D1（M0 多店）：房型归属门店。未传时由路由回退到租户下的默认门店（保持旧调用兼容）。
+    hotel_id: int | None = None
     # 批次② 字段补全
     bed_number: int = 1
     short_name: str | None = None
@@ -80,6 +82,7 @@ class RoomTypeCreate(BaseModel):
 class RoomTypeOut(BaseModel):
     id: StrId
     tenant_id: str
+    hotel_id: StrId  # D1：房型所属门店
     code: str
     name: str
     base_price: int

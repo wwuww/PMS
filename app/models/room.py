@@ -9,8 +9,13 @@ from app.models.base import Base, IntPkMixin, TenantMixin, TimestampMixin
 
 class RoomType(IntPkMixin, TenantMixin, TimestampMixin, Base):
     __tablename__ = "room_types"
-    __table_args__ = (UniqueConstraint("tenant_id", "code"),)
+    # D1（M0 多店）：唯一约束升门店级 —— 允许两店各建同名房型（如都叫 STD）。
+    __table_args__ = (UniqueConstraint("tenant_id", "hotel_id", "code"),)
 
+    # D1：房型归属门店。NOT NULL —— 房型必须挂在具体门店下（多店独立维护）。
+    hotel_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("hotels.id"), nullable=False, index=True
+    )
     code: Mapped[str] = mapped_column(String(32), nullable=False)
     name: Mapped[str] = mapped_column(String(64), nullable=False)
     base_price: Mapped[int] = mapped_column(Integer, default=0)  # 分

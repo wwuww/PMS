@@ -291,12 +291,13 @@ def test_apply_recommendation_date_range(
         "/api/v1/tenants", json={"code": "t-yield-r", "name": "区间测试"}
     ).json()
     trid = tenant_r["id"]
-    rt = client.post(
-        f"/api/v1/tenants/{trid}/room-types",
-        json={"code": "RSTD", "name": "区间房型", "base_price": 30000},
-    ).json()
+    # D1（M0 多店）：房型需归属门店，先建门店再建房型并显式传 hotel_id
     hotel = client.post(
         f"/api/v1/tenants/{trid}/hotels", json={"code": "RH1", "name": "区间店"}
+    ).json()
+    rt = client.post(
+        f"/api/v1/tenants/{trid}/room-types",
+        json={"code": "RSTD", "name": "区间房型", "base_price": 30000, "hotel_id": hotel["id"]},
     ).json()
     rec = client.post(
         "/api/v1/tenants/t-yield-r/yield/pricing/recommend",

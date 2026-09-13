@@ -658,8 +658,27 @@ async def create_room_type(
     tenant = await _lookup_tenant(tenant_id, session)
     if not tenant:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "租户不存在")
+    # D1（M0 多店）：房型必须归属门店。未显式指定时回退到租户下的默认门店
+    # （按 hotels.id 升序第一家）——保持旧调用（前端未传 hotel_id）兼容。
+    hotel_id = body.hotel_id
+    if hotel_id is None:
+        default_hotel = (
+            await session.execute(
+                select(Hotel)
+                .where(Hotel.tenant_id == tenant.code)
+                .order_by(Hotel.id)
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        if default_hotel is None:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                "该租户下没有门店，无法创建房型（请先建门店）",
+            )
+        hotel_id = default_hotel.id
     room_type = RoomType(
         tenant_id=tenant.code,
+        hotel_id=hotel_id,  # D1
         code=body.code,
         name=body.name,
         base_price=body.base_price,
@@ -677,7 +696,7 @@ async def create_room_type(
     except IntegrityError as exc:
         await session.rollback()
         raise HTTPException(
-            status.HTTP_409_CONFLICT, f"房型代码 {body.code} 已存在"
+            status.HTTP_409_CONFLICT, f"房型代码 {body.code} 在本门店已存在"
         ) from exc
     await session.refresh(room_type)
     return room_type
@@ -685,10 +704,18 @@ async def create_room_type(
 
 @router.get("/tenants/{tenant_id}/room-types", response_model=list[RoomTypeOut])
 async def list_room_types(
-    tenant_id: str, session: AsyncSession = Depends(get_session)
+    tenant_id: str,
+    hotel_id: int | None = None,
+    session: AsyncSession = Depends(get_session),
 ) -> list[RoomType]:
-    """列出某租户下的房型（前端新建预订表单）。"""
+    """列出某租户下的房型（前端新建预订表单）。
+
+    D1（M0 多店）：可选 ``?hotel_id=`` 按门店过滤；不传则返回租户下全部
+    （兼容旧调用）。多店场景请显式传 hotel_id，避免跨店房型混列。
+    """
     stmt = select(RoomType).where(RoomType.tenant_id == tenant_id)
+    if hotel_id is not None:
+        stmt = stmt.where(RoomType.hotel_id == hotel_id)
     result = await session.execute(stmt)
     return list(result.scalars())
 
@@ -947,8 +974,14 @@ async def upsert_price_calendar(
     if row:
         row.price = body.price
     else:
+        # D1（M0 多店）：价格覆盖归属门店，由房型推导（room_type 是门店唯一的，
+        # 不信任客户端传参，避免写错门店导致两店串价）。
+        rt = await session.get(RoomType, body.room_type_id)
+        if rt is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "房型不存在")
         row = PriceCalendar(
             tenant_id=tenant_id,
+            hotel_id=rt.hotel_id,  # D1
             room_type_id=body.room_type_id,
             date=body.date,
             price=body.price,
@@ -1038,8 +1071,14 @@ async def batch_upsert_price_calendar(
         if row:
             row.price = item.price
         else:
+            # D1（M0 多店）：同上，门店由房型推导
+            rt = await session.get(RoomType, item.room_type_id)
+            if rt is None:
+                blocked.append(f"{item.room_type_id}/{item.date}: 房型不存在")
+                continue
             row = PriceCalendar(
                 tenant_id=tenant_id,
+                hotel_id=rt.hotel_id,  # D1
                 room_type_id=item.room_type_id,
                 date=item.date,
                 price=item.price,

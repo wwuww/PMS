@@ -78,10 +78,18 @@ class PriceService:
     async def availability(
         self, tenant_id: str, room_type_id: int, date: str
     ) -> dict[str, int]:
-        """房型 × 日期房量占用聚合。"""
+        """房型 × 日期房量占用聚合。
+
+        D1（M0 多店）：房量必须按**门店**隔离——房型归属门店（``RoomType.hotel_id``），
+        房量聚合加 ``Room.hotel_id == <该房型所属门店>``。否则二店的房量会算上一店的房间
+        （跨店超售）。门店从房型推导（不新增参数），保证所有调用点自动正确。
+        """
+        hotel_id = await self._room_type_hotel_id(room_type_id)
         total = await self.session.execute(
             select(func.count()).select_from(Room).where(
-                Room.tenant_id == tenant_id, Room.room_type_id == room_type_id
+                Room.tenant_id == tenant_id,
+                Room.room_type_id == room_type_id,
+                Room.hotel_id == hotel_id,  # D1：门店隔离
             )
         )
         total_n = int(total.scalar() or 0)
@@ -90,6 +98,7 @@ class PriceService:
             select(func.count()).select_from(Booking).where(
                 Booking.tenant_id == tenant_id,
                 Booking.room_type_id == room_type_id,
+                Booking.hotel_id == hotel_id,  # D1：门店隔离
                 Booking.status.in_([BookingStatus.CREATED.value, BookingStatus.CHECKED_IN.value]),
                 Booking.check_in_date <= date,
                 Booking.check_out_date > date,
@@ -99,6 +108,17 @@ class PriceService:
         )
         booked_n = int(booked.scalar() or 0)
         return {"total": total_n, "booked": booked_n, "available": max(total_n - booked_n, 0)}
+
+    async def _room_type_hotel_id(self, room_type_id: int) -> int:
+        """取房型所属门店 id（D1 门店隔离的依据）。
+
+        房型不存在时抛 ``ValueError``——调用方本就在查该房型的房量，
+        房型不存在属非法输入，静默返回 0 会掩盖问题。
+        """
+        rt = await self.session.get(RoomType, room_type_id)
+        if rt is None:
+            raise ValueError("room_type 不存在")
+        return rt.hotel_id
 
     # ---- M30 B4 批量化版本（与逐晚版本语义等价） ----
 
@@ -114,15 +134,20 @@ class PriceService:
         与逐晚版本逐字段一致（``ci <= d < co`` 占用判断保留；``status IN (CREATED, CHECKED_IN)``
         与 ``stay_type != "hourly"`` 保留）。
 
+        D1（M0 多店）：与逐晚版一致地按房型所属门店隔离（``Room/Booking.hotel_id``）。
+
         查询次数：原逐晚版 ``len(dates) * 2``（每晚 1 COUNT(Room) + 1 COUNT(Booking)）；
         批量版固定 **2 次**（1 COUNT(Room) + 1 SELECT(Booking) → Python 端按日聚合）。
         """
         if not dates:
             return {}
-        # 1. 房型总房数（与原版完全相同：1 次 COUNT(Room)）
+        hotel_id = await self._room_type_hotel_id(room_type_id)
+        # 1. 房型总房数（门店隔离）
         total = await self.session.execute(
             select(func.count()).select_from(Room).where(
-                Room.tenant_id == tenant_id, Room.room_type_id == room_type_id
+                Room.tenant_id == tenant_id,
+                Room.room_type_id == room_type_id,
+                Room.hotel_id == hotel_id,  # D1：门店隔离
             )
         )
         total_n = int(total.scalar() or 0)
@@ -136,6 +161,7 @@ class PriceService:
             select(Booking.check_in_date, Booking.check_out_date).where(
                 Booking.tenant_id == tenant_id,
                 Booking.room_type_id == room_type_id,
+                Booking.hotel_id == hotel_id,  # D1：门店隔离
                 Booking.status.in_([
                     BookingStatus.CREATED.value, BookingStatus.CHECKED_IN.value
                 ]),

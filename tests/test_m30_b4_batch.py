@@ -35,7 +35,7 @@ def _seed_basic(client: TestClient) -> dict:
     ).json()
     rt = client.post(
         f"/api/v1/tenants/{tenant['id']}/room-types",
-        json={"code": "STD", "name": "标间", "base_price": 30000},
+        json={"code": "STD", "name": "标间", "base_price": 30000, "hotel_id": hotel["id"]},
     ).json()
     client.post(
         f"/api/v1/hotels/{hotel['id']}/rooms",
@@ -201,6 +201,8 @@ class TestM30B4Batch:
         tenant_code = s["tenant"]["code"]
         # RoomType/PriceCalendar.room_type_id 是 BigInteger，需要 int 而非 str
         rt_id = int(s["room_type"]["id"])
+        # D1（M0 多店）：PriceCalendar.hotel_id NOT NULL，取房型所属门店
+        rt_hotel_id = int(s["room_type"]["hotel_id"])
         dates = ["2026-12-01", "2026-12-02", "2026-12-03"]
 
         # 直接种 RateCode（90% 折扣）+ PriceCalendar 覆盖（节假日 +5000）
@@ -222,6 +224,7 @@ class TestM30B4Batch:
                 session.add(
                     PriceCalendar(
                         tenant_id=tenant_code,
+                        hotel_id=rt_hotel_id,  # D1
                         room_type_id=rt_id,
                         date=d,
                         price=35000,  # 节假日 +5000

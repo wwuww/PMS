@@ -38,8 +38,12 @@ class MpService:
         ``1 batch_availability + 1 batch_resolve``（每房型 2 次查询替代 2*N 次）。
         """
         nights = _nights(check_in_date, check_out_date)
+        # D1（M0 多店）：小程序按门店报价，只取本门店房型。
         rows = await self.session.execute(
-            select(RoomType).where(RoomType.tenant_id == tenant_id)
+            select(RoomType).where(
+                RoomType.tenant_id == tenant_id,
+                RoomType.hotel_id == hotel_id,
+            )
         )
         room_types = list(rows.scalars())
         # 一次性批量解析所有房型 × 所有日期（M30 B4）

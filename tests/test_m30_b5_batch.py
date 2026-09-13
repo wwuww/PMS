@@ -40,9 +40,10 @@ def three_hotel_tenant(client: TestClient) -> dict[str, Any]:
     h1 = client.post(f"/api/v1/tenants/{t['id']}/hotels", json={"code": "H1", "name": "深圳店"}).json()
     h2 = client.post(f"/api/v1/tenants/{t['id']}/hotels", json={"code": "H2", "name": "广州店"}).json()
     h3 = client.post(f"/api/v1/tenants/{t['id']}/hotels", json={"code": "H3", "name": "上海店"}).json()
-    rt1 = client.post(f"/api/v1/tenants/{t['id']}/room-types", json={"code": "STD", "name": "标准间", "base_price": 20000}).json()
-    rt2 = client.post(f"/api/v1/tenants/{t['id']}/room-types", json={"code": "DLX", "name": "豪华间", "base_price": 30000}).json()
-    rt3 = client.post(f"/api/v1/tenants/{t['id']}/room-types", json={"code": "STE", "name": "套房", "base_price": 50000}).json()
+    # D1（M0 多店）：房型必须归属门店，显式传 hotel_id（一店一房型）
+    rt1 = client.post(f"/api/v1/tenants/{t['id']}/room-types", json={"code": "STD", "name": "标准间", "base_price": 20000, "hotel_id": h1["id"]}).json()
+    rt2 = client.post(f"/api/v1/tenants/{t['id']}/room-types", json={"code": "DLX", "name": "豪华间", "base_price": 30000, "hotel_id": h2["id"]}).json()
+    rt3 = client.post(f"/api/v1/tenants/{t['id']}/room-types", json={"code": "STE", "name": "套房", "base_price": 50000, "hotel_id": h3["id"]}).json()
     client.post(f"/api/v1/hotels/{h1['id']}/rooms", json=[
         {"room_type_id": rt1["id"], "room_no": "0101"},
         {"room_type_id": rt1["id"], "room_no": "0102"},

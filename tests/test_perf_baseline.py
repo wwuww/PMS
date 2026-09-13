@@ -120,6 +120,7 @@ async def seeded(monkeypatch) -> dict[str, Any]:  # noqa: ANN001
             room_types = [
                 RoomType(
                     tenant_id=TENANT_CODE,
+                    hotel_id=hotels[i % len(hotels)].id,  # D1（M0 多店）：按店轮流归属
                     code=f"PRT{i + 1}",
                     name=f"压测房型{i + 1}",
                     base_price=30000 + i * 1000,

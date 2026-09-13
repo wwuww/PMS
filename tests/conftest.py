@@ -51,6 +51,11 @@ async def _seed_admin_committed(tenant_id: str):  # noqa: ANN202
 
     这里改用独立会话播种并提交：既让 admin 持久化（后续请求直接命中），
     又不触碰业务会话事务语义（业务测试仍可依赖回滚做隔离）。
+
+    ⚠️ 必须先 ``seed_default_roles``：本旁路会把「无角色绑定」的 admin 交给
+    ``require_perm``，缺角色即缺全部权限点 → 需要权限的接口全 403。
+    历史用例多经 ``/api/v1/tenants`` 开通流程隐式播种角色，掩盖了此问题；
+    自建独立库的用例（如 test_ota_mappings）会直接踩中。
     """
     from sqlalchemy.ext.asyncio import async_sessionmaker
 
@@ -59,7 +64,10 @@ async def _seed_admin_committed(tenant_id: str):  # noqa: ANN202
 
     seed_session_factory = async_sessionmaker(get_engine(), expire_on_commit=False)
     async with seed_session_factory() as seed_session:
-        user = await RbacService(seed_session).seed_default_admin(tenant_id)
+        svc = RbacService(seed_session)
+        await svc.seed_default_roles(tenant_id)
+        await seed_session.flush()
+        user = await svc.seed_default_admin(tenant_id)
         await seed_session.commit()
         return user
 
