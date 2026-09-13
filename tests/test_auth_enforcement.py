@@ -230,3 +230,68 @@ class TestOpenApiAdminOnly:
         _seed(client, "oa7")
         r = client.get("/api/v1/tenants/oa7/openapi/v1/hotels")
         assert r.status_code == 401
+
+
+class TestReversePrivilegeOnUserRoleList:
+    """M1-A3 行动清单 #5：用户/角色列表反向越权修复。
+
+    历史缺口：``GET /tenants/{tid}/users`` 与 ``/roles`` 只挂全局 ``require_auth``，
+    任何已登录用户（含**前台**）都能读取全部账号与角色定义 —— 属隐私类读操作敞口。
+    修复：分别收归 ``user.manage`` / ``role.manage``（仅管理员持有）。
+    """
+
+    def _front_token(self, client: TestClient, code: str, d: dict) -> str:
+        u = client.post(
+            f"/api/v1/tenants/{code}/users",
+            json={"username": "front5", "password": "pw123456"},
+            headers=d["auth"],
+        ).json()
+        roles = client.get(f"/api/v1/tenants/{code}/roles", headers=d["auth"]).json()
+        front = next(r for r in roles if r["name"] == "前台")
+        client.post(
+            f"/api/v1/tenants/{code}/users/{u['id']}/roles",
+            json={"role_id": front["id"], "hotel_id": d["h"]["id"]},
+            headers=d["auth"],
+        )
+        return client.post(
+            f"/api/v1/tenants/{code}/auth/login",
+            json={"username": "front5", "password": "pw123456"},
+        ).json()["token"]
+
+    def test_staff_denied_on_user_list(self, client: TestClient) -> None:
+        """前台（无 user.manage）读用户列表 → 403，不再是 200 全量泄露。"""
+        d = _seed(client, "rev1")
+        token = self._front_token(client, "rev1", d)
+        r = client.get(
+            "/api/v1/tenants/rev1/users",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 403
+        assert "user.manage" in r.json()["detail"]
+
+    def test_staff_denied_on_role_list(self, client: TestClient) -> None:
+        """前台（无 role.manage）读角色列表 → 403。"""
+        d = _seed(client, "rev2")
+        token = self._front_token(client, "rev2", d)
+        r = client.get(
+            "/api/v1/tenants/rev2/roles",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 403
+        assert "role.manage" in r.json()["detail"]
+
+    def test_admin_can_list_users_and_roles(self, client: TestClient) -> None:
+        """管理员持有 user.manage / role.manage → 正常 200（确认未误伤）。"""
+        d = _seed(client, "rev3")
+        ru = client.get("/api/v1/tenants/rev3/users", headers=d["auth"])
+        rr = client.get("/api/v1/tenants/rev3/roles", headers=d["auth"])
+        assert ru.status_code == 200
+        assert rr.status_code == 200
+        assert len(ru.json()) >= 1
+        assert any(r["name"] == "管理员" for r in rr.json())
+
+    def test_anonymous_denied_on_user_list(self, client: TestClient) -> None:
+        """未登录 → 401（认证层先于授权层拦截）。"""
+        _seed(client, "rev4")
+        r = client.get("/api/v1/tenants/rev4/users")
+        assert r.status_code == 401

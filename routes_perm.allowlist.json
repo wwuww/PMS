@@ -1,10 +1,10 @@
 {
-  "generated_at": "2026-09-13T01:25:44+00:00",
+  "generated_at": "2026-09-13T07:38:04+00:00",
   "total_routes": 242,
-  "protected_count": 70,
-  "unprotected_count": 172,
+  "protected_count": 72,
+  "unprotected_count": 170,
   "unprotected_writes_count": 84,
-  "unprotected_reads_count": 88,
+  "unprotected_reads_count": 86,
   "items": [
     {
       "method": "POST",
@@ -1257,7 +1257,7 @@
     {
       "method": "GET",
       "path": "/api/v1/tenants/{tenant_id}/roles",
-      "has_perm": false,
+      "has_perm": true,
       "is_write": false
     },
     {
@@ -1377,7 +1377,7 @@
     {
       "method": "GET",
       "path": "/api/v1/tenants/{tenant_id}/users",
-      "has_perm": false,
+      "has_perm": true,
       "is_write": false
     },
     {

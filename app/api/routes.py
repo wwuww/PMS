@@ -2461,7 +2461,11 @@ async def create_user(
     return user
 
 
-@router.get("/tenants/{tenant_id}/users", response_model=list[UserOut])
+@router.get(
+    "/tenants/{tenant_id}/users",
+    response_model=list[UserOut],
+    dependencies=[Security(require_perm, scopes=[USER_MANAGE])],
+)
 async def list_users(
     tenant_id: str, session: AsyncSession = Depends(get_session)
 ) -> list[User]:
@@ -2490,7 +2494,11 @@ async def create_role(
     return role
 
 
-@router.get("/tenants/{tenant_id}/roles", response_model=list[RoleOut])
+@router.get(
+    "/tenants/{tenant_id}/roles",
+    response_model=list[RoleOut],
+    dependencies=[Security(require_perm, scopes=[ROLE_MANAGE])],
+)
 async def list_roles(
     tenant_id: str, session: AsyncSession = Depends(get_session)
 ) -> list[Role]:

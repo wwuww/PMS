@@ -250,6 +250,8 @@ export default function CheckInRegister() {
 
   // 同 Tab 二次跳转：房号参数变化即重置
   const lastRoomRef = useRef<string>("");
+  // 「补交押金(O)」按钮定位锚点：滚动到内联押金面板，不再错跳无押金能力的收银页
+  const depositPanelRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!roomNoParam || roomNoParam === lastRoomRef.current) return;
     lastRoomRef.current = roomNoParam;
@@ -640,7 +642,13 @@ export default function CheckInRegister() {
         <div style={{ fontSize: 12, color: "#8a919c", margin: "2px 0 4px" }}>基本操作</div>
         {sideBtn(<SaveOutlined />, "保存(S)", onSave, isStay)}
         {sideBtn(<PrinterOutlined />, "打印(P)", () => window.print())}
-        {sideBtn(<DollarOutlined />, "补交押金(O)", () => navigate("/billing"), !isStay)}
+        {sideBtn(<DollarOutlined />, "补交押金(O)", () => {
+          if (!depositBookingId) {
+            message.warning("该登记单尚未生成，请先办理入住后再收押金");
+            return;
+          }
+          depositPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+        }, !isStay)}
         {sideBtn(
           <SelectOutlined />,
           "续住/延住(Y)",
@@ -928,7 +936,9 @@ export default function CheckInRegister() {
         </div>
 
         {/* 押金行：接后端押金/预授权能力（M36 接线，取代原写死的四个禁用控件） */}
-        <DepositQuickPanel bookingId={depositBookingId} roomNo={roomNo || null} />
+        <div ref={depositPanelRef}>
+          <DepositQuickPanel bookingId={depositBookingId} roomNo={roomNo || null} />
+        </div>
         {/* 批次② 核心实体字段补全：登记选项（原为 6 个禁用占位 Checkbox，现改为实时绑定 form 状态） */}
         <div style={{ display: "flex", gap: 16, marginTop: 8, flexWrap: "wrap", alignItems: "center" }}>
           <Checkbox
@@ -1082,7 +1092,9 @@ export default function CheckInRegister() {
           </Button>
         </>
       ) : (
-        <Typography.Text type="secondary">办理入住后此处显示账务概要；押金/退款请在收银结账页操作。</Typography.Text>
+        <Typography.Text type="secondary">
+          办理入住后此处显示账务概要；押金请在左侧「押金 / 预授权」面板操作，结账请前往收银页。
+        </Typography.Text>
       )}
     </div>
   );
