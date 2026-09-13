@@ -67,6 +67,7 @@ repro_audit.py
 .git.bak/
 .git.broken/
 .git.corrupt-*/
+.git.snapshot-*/
 
 # 已迁移到根的旧独立仓库目录（保留作冷备，禁止再被追踪）
 pms/
