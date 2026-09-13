@@ -66,6 +66,16 @@ repro_audit.py
 # 版本库备份/损坏恢复目录（不应纳入版本控制）
 .git.bak/
 .git.broken/
+.git.corrupt-*/
+
+# 已迁移到根的旧独立仓库目录（保留作冷备，禁止再被追踪）
+pms/
+
+# Anchor bare 仓库副本与产品战略交付物/工坊产物（不入库）
+PMS-remote.git/
+deliverables/
+_arch_tmp/
+.playwright-cli/
 
 # CI 门禁日志（失败后保留供排查，下次运行前自动清空）
 .ci-logs/

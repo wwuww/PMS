@@ -310,3 +310,170 @@ class TestReversePrivilegeOnUserRoleList:
         _seed(client, "rev4")
         r = client.get("/api/v1/tenants/rev4/users")
         assert r.status_code == 401
+
+
+class TestA3BillingPermission:
+    """M1-A3：基础业务操作码正确门控 + 双码 AND 守卫。
+
+    行动清单：A 桶（账务）15 条挂码 —— 建单/挂账/收款/结账/预付冲抵/积分支付
+    （``billing.manage``，前台必能）、应收账户（``ar.manage``）、会员建档/充值
+    （``member.manage``，充值双码 AND）、开班/交班（``shift.manage``）——
+    仅管理员 + 门店经理持有 ``ar.manage/member.manage/shift.manage``，前台只
+    有 ``billing.manage``。
+
+    这些用例覆盖正交点（billing vs ar vs shift vs member）+ 双码 AND 守卫。
+    """
+
+    def _front_token(self, client: TestClient, code: str, d: dict) -> str:
+        u = client.post(
+            f"/api/v1/tenants/{code}/users",
+            json={"username": "front_a3", "password": "pw123456"},
+            headers=d["auth"],
+        ).json()
+        roles = client.get(f"/api/v1/tenants/{code}/roles", headers=d["auth"]).json()
+        front = next(r for r in roles if r["name"] == "前台")
+        client.post(
+            f"/api/v1/tenants/{code}/users/{u['id']}/roles",
+            json={"role_id": front["id"], "hotel_id": d["h"]["id"]},
+            headers=d["auth"],
+        )
+        return client.post(
+            f"/api/v1/tenants/{code}/auth/login",
+            json={"username": "front_a3", "password": "pw123456"},
+        ).json()["token"]
+
+    def test_front_can_open_bill(self, client: TestClient) -> None:
+        """前台有 billing.manage → 应收开单 201（确认前台收款路径不被打死）。"""
+        d = _seed(client, "a3bill1")
+        token = self._front_token(client, "a3bill1", d)
+        r = client.post(
+            "/api/v1/tenants/a3bill1/bills",
+            json={
+                "hotel_id": d["h"]["id"],
+                "guest_name": "测试客",
+                "source": "WALK_IN",
+            },
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 201, r.text
+        assert r.json()["guest_name"] == "测试客"
+
+    def test_front_cannot_adjust_bill(self, client: TestClient) -> None:
+        """前台有 billing.manage 但无 billing.adjust → 冲账拒绝（403）。
+
+        验证 BILLING_MANAGE 与 BILL_ADJUST 正交：能收 ≠ 能冲。
+        """
+        d = _seed(client, "a3bill2")
+        token = self._front_token(client, "a3bill2", d)
+        # 后台建一单
+        bill = client.post(
+            "/api/v1/tenants/a3bill2/bills",
+            json={"hotel_id": d["h"]["id"], "guest_name": "冲账测试", "source": "WALK_IN"},
+            headers=d["auth"],
+        ).json()
+        r = client.post(
+            f"/api/v1/tenants/a3bill2/bills/{bill['id']}/adjustments",
+            json={"charge_type": "MISC", "amount": -100, "description": "前台冲账测试"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 403
+        assert "billing.adjust" in r.json()["detail"]
+
+    def test_front_cannot_open_ar_account(self, client: TestClient) -> None:
+        """前台无 ar.manage → 应收账户开建 403。"""
+        d = _seed(client, "a3ar1")
+        token = self._front_token(client, "a3ar1", d)
+        r = client.post(
+            "/api/v1/tenants/a3ar1/ar-accounts",
+            json={
+                "hotel_id": d["h"]["id"],
+                "code": "AR-FRONT",
+                "name": "前台尝试建应收",
+                "protocol_unit": "测试",
+            },
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 403
+        assert "ar.manage" in r.json()["detail"]
+
+    def test_front_cannot_open_or_close_shift(self, client: TestClient) -> None:
+        """前台无 shift.manage → 开班 403。"""
+        d = _seed(client, "a3shift1")
+        token = self._front_token(client, "a3shift1", d)
+        r = client.post(
+            "/api/v1/tenants/a3shift1/shifts/open",
+            json={
+                "hotel_id": d["h"]["id"],
+                "operator": "front_a3",
+                "opening_cash_cents": 0,
+            },
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 403
+        assert "shift.manage" in r.json()["detail"]
+
+    def test_front_cannot_enroll_member(self, client: TestClient) -> None:
+        """前台无 member.manage → 会员建档 403。"""
+        d = _seed(client, "a3mem1")
+        token = self._front_token(client, "a3mem1", d)
+        r = client.post(
+            "/api/v1/tenants/a3mem1/members",
+            json={"phone": "13800138000", "name": "前台尝试建会员"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 403
+        assert "member.manage" in r.json()["detail"]
+
+    def test_front_cannot_recharge(self, client: TestClient) -> None:
+        """前台有 billing.manage 但无 member.manage → 充值双码 AND 拒绝 403。
+
+        双码 AND 守卫是 M1-A 的关键防线：仅持 BILLING_MANAGE 不够，
+        也必须持 MEMBER_MANAGE 才允许接触会员现金账户。
+        """
+        d = _seed(client, "a3mem2")
+        token = self._front_token(client, "a3mem2", d)
+        # 后台建档会员（管理员）
+        client.post(
+            "/api/v1/tenants/a3mem2/members",
+            json={"phone": "13900139000", "name": "充值测试"},
+            headers=d["auth"],
+        )
+        r = client.post(
+            "/api/v1/tenants/a3mem2/members/13900139000/recharge",
+            json={"amount_cents": 10000, "operator": "front_a3"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 403
+        # 双码之一的 billing.manage 是真实权限之一，但 member.manage 缺 → OR 部分能，AND 拒
+        detail = r.json()["detail"]
+        assert ("member.manage" in detail) or ("billing.manage" in detail)
+
+    def test_admin_can_open_ar_account(self, client: TestClient) -> None:
+        """管理员持有 ar.manage → 应收账户开建 201（确认未误伤）。"""
+        d = _seed(client, "a3ar2")
+        r = client.post(
+            "/api/v1/tenants/a3ar2/ar-accounts",
+            json={
+                "hotel_id": d["h"]["id"],
+                "name": "管理员建应收",
+                "operator": "admin",
+            },
+            headers=d["auth"],
+        )
+        assert r.status_code == 201, r.text
+        assert r.json()["name"] == "管理员建应收"
+
+    def test_admin_can_open_shift(self, client: TestClient) -> None:
+        """管理员持有 shift.manage → 开班 201（确认未误伤）。"""
+        d = _seed(client, "a3shift2")
+        r = client.post(
+            "/api/v1/tenants/a3shift2/shifts/open",
+            json={
+                "hotel_id": d["h"]["id"],
+                "cashier": "admin",
+                "opening_float_cents": 0,
+            },
+            headers=d["auth"],
+        )
+        assert r.status_code in (200, 201), r.text
+

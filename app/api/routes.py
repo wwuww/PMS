@@ -340,6 +340,10 @@ from app.services.permissions import (
     BLACKLIST_MANAGE,
     COUPON_MANAGE,
     BREAKFAST_MANAGE,
+    BILLING_MANAGE,
+    AR_MANAGE,
+    MEMBER_MANAGE,
+    SHIFT_MANAGE,
 )
 from app.services.pay_service import (
     PayNotifySignatureError,
@@ -1692,6 +1696,7 @@ async def channel_availability_push(
     "/tenants/{tenant_id}/members",
     response_model=MemberOut,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Security(require_perm, scopes=[MEMBER_MANAGE])],
 )
 async def create_member(
     tenant_id: str, body: MemberCreate, session: AsyncSession = Depends(get_session)
@@ -1723,7 +1728,11 @@ async def get_member(
     return member
 
 
-@router.post("/tenants/{tenant_id}/members/{phone}/recharge", response_model=MemberOut)
+@router.post(
+    "/tenants/{tenant_id}/members/{phone}/recharge",
+    response_model=MemberOut,
+    dependencies=[Security(require_perm, scopes=[MEMBER_MANAGE, BILLING_MANAGE])],
+)
 async def recharge_member(
     tenant_id: str, phone: str, body: MemberRechargeIn, session: AsyncSession = Depends(get_session)
 ) -> Member:
@@ -1878,7 +1887,12 @@ async def update_guest(
 # ---------- 前台收银（M3） ----------
 
 
-@router.post("/tenants/{tenant_id}/bills", response_model=BillOut, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/tenants/{tenant_id}/bills",
+    response_model=BillOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Security(require_perm, scopes=[BILLING_MANAGE])],
+)
 async def open_bill(
     tenant_id: str, body: BillOpenIn, session: AsyncSession = Depends(get_session)
 ) -> Bill:
@@ -1913,7 +1927,11 @@ async def list_bills(
     return list(result.scalars())
 
 
-@router.post("/tenants/{tenant_id}/bills/{bill_id}/charges", response_model=BillOut)
+@router.post(
+    "/tenants/{tenant_id}/bills/{bill_id}/charges",
+    response_model=BillOut,
+    dependencies=[Security(require_perm, scopes=[BILLING_MANAGE])],
+)
 async def add_charge(
     tenant_id: str,
     bill_id: int,
@@ -1950,7 +1968,11 @@ async def add_charge(
     return await _bill_with_items(bill, session)
 
 
-@router.post("/tenants/{tenant_id}/bills/{bill_id}/payments", response_model=BillOut)
+@router.post(
+    "/tenants/{tenant_id}/bills/{bill_id}/payments",
+    response_model=BillOut,
+    dependencies=[Security(require_perm, scopes=[BILLING_MANAGE])],
+)
 async def take_payment(
     tenant_id: str, bill_id: int, body: PaymentIn, session: AsyncSession = Depends(get_session)
 ) -> Bill:
@@ -1969,7 +1991,11 @@ async def take_payment(
     return await _bill_with_items(bill, session)
 
 
-@router.post("/tenants/{tenant_id}/bills/{bill_id}/settle", response_model=BillOut)
+@router.post(
+    "/tenants/{tenant_id}/bills/{bill_id}/settle",
+    response_model=BillOut,
+    dependencies=[Security(require_perm, scopes=[BILLING_MANAGE])],
+)
 async def settle_bill(
     tenant_id: str, bill_id: int, session: AsyncSession = Depends(get_session)
 ) -> Bill:
@@ -2024,6 +2050,7 @@ async def list_ar_accounts(
     "/tenants/{tenant_id}/ar-accounts",
     response_model=ArAccountOut,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Security(require_perm, scopes=[AR_MANAGE])],
 )
 async def create_ar_account(
     tenant_id: str, body: ArAccountCreate, session: AsyncSession = Depends(get_session)
@@ -2062,6 +2089,7 @@ async def list_ar_bills(
 @router.post(
     "/tenants/{tenant_id}/ar-accounts/{account_id}/charge",
     response_model=BillOut,
+    dependencies=[Security(require_perm, scopes=[AR_MANAGE])],
 )
 async def charge_bill_to_ar_account(
     tenant_id: str,
@@ -2084,6 +2112,7 @@ async def charge_bill_to_ar_account(
 @router.post(
     "/tenants/{tenant_id}/ar-accounts/{account_id}/repayments",
     response_model=ArAccountOut,
+    dependencies=[Security(require_perm, scopes=[AR_MANAGE])],
 )
 async def repay_ar_account(
     tenant_id: str,
@@ -2294,7 +2323,11 @@ async def list_adjustments(
 # ---------- 前台收银交班（M3） ----------
 
 
-@router.post("/tenants/{tenant_id}/shifts/open", response_model=ShiftOut)
+@router.post(
+    "/tenants/{tenant_id}/shifts/open",
+    response_model=ShiftOut,
+    dependencies=[Security(require_perm, scopes=[SHIFT_MANAGE])],
+)
 async def open_shift(
     tenant_id: str, body: ShiftOpenIn, session: AsyncSession = Depends(get_session)
 ) -> ShiftHandover:
@@ -2305,7 +2338,11 @@ async def open_shift(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
 
 
-@router.post("/tenants/{tenant_id}/shifts/{shift_id}/close", response_model=ShiftOut)
+@router.post(
+    "/tenants/{tenant_id}/shifts/{shift_id}/close",
+    response_model=ShiftOut,
+    dependencies=[Security(require_perm, scopes=[SHIFT_MANAGE])],
+)
 async def close_shift(
     tenant_id: str,
     shift_id: int,
@@ -2879,7 +2916,11 @@ async def list_pay_orders(
     return await PayService(session).list_orders(tenant_id, status_)
 
 
-@router.post("/tenants/{tenant_id}/pay-orders/{out_trade_no}/close", response_model=PayOrderOut)
+@router.post(
+    "/tenants/{tenant_id}/pay-orders/{out_trade_no}/close",
+    response_model=PayOrderOut,
+    dependencies=[Security(require_perm, scopes=[BILLING_MANAGE])],
+)
 async def close_pay_order(
     tenant_id: str, out_trade_no: str, session: AsyncSession = Depends(get_session)
 ) -> PayOrder:
@@ -2901,7 +2942,11 @@ async def close_pay_order(
     return closed
 
 
-@router.post("/tenants/{tenant_id}/pay/reconcile", response_model=PayReconcileOut)
+@router.post(
+    "/tenants/{tenant_id}/pay/reconcile",
+    response_model=PayReconcileOut,
+    dependencies=[Security(require_perm, scopes=[BILLING_MANAGE])],
+)
 async def pay_reconcile(
     tenant_id: str, body: PayReconcileIn, session: AsyncSession = Depends(get_session)
 ) -> dict:
@@ -2912,7 +2957,11 @@ async def pay_reconcile(
     return result
 
 
-@router.post("/tenants/{tenant_id}/bills/{bill_id}/apply-prepay", response_model=BillOut)
+@router.post(
+    "/tenants/{tenant_id}/bills/{bill_id}/apply-prepay",
+    response_model=BillOut,
+    dependencies=[Security(require_perm, scopes=[BILLING_MANAGE])],
+)
 async def apply_prepay(
     tenant_id: str, bill_id: int, session: AsyncSession = Depends(get_session)
 ) -> Bill:
@@ -5035,7 +5084,10 @@ async def list_push_logs(
 # ---------- M31：核心缺口关闭（验收 #9 / #10 / #34） ----------
 
 
-@router.post("/tenants/{tenant_id}/bills/{bill_id}/pay-points")
+@router.post(
+    "/tenants/{tenant_id}/bills/{bill_id}/pay-points",
+    dependencies=[Security(require_perm, scopes=[BILLING_MANAGE])],
+)
 async def pay_bill_with_points(
     tenant_id: str,
     bill_id: str,

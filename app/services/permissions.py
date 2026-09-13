@@ -31,6 +31,11 @@ INVOICE_MANAGE = "invoice.manage"     # 开票 / 作废 / 查 / 按账单查
 BLACKLIST_MANAGE = "blacklist.manage"  # 黑名单 增/删/查（敏感：仅管理员 + 门店经理）
 COUPON_MANAGE = "coupon.manage"        # 券模板 / 发券 / 核销 / 作废（前台可用）
 BREAKFAST_MANAGE = "breakfast.manage"  # 早餐券 发/核销/作废/查（前台可用）
+# M1-A3 权限清偿：基础业务操作码（与 BILL_ADJUST/REFUND/DISCOUNT 的"敏感账务"正交）
+BILLING_MANAGE = "billing.manage"      # 建单/挂账/收款/结账/预付冲抵/积分支付（前台必能收款）
+AR_MANAGE = "ar.manage"                # 应收账户 建/挂账/回款（仅管理员 + 门店经理）
+MEMBER_MANAGE = "member.manage"        # 会员 建档/充值（充值=现金入金，双码 AND billing.manage）
+SHIFT_MANAGE = "shift.manage"          # 开班/交班（仅管理员 + 门店经理）
 
 ALL_PERMISSIONS = {
     PRICE_EDIT,
@@ -51,6 +56,10 @@ ALL_PERMISSIONS = {
     BLACKLIST_MANAGE,
     COUPON_MANAGE,
     BREAKFAST_MANAGE,
+    BILLING_MANAGE,
+    AR_MANAGE,
+    MEMBER_MANAGE,
+    SHIFT_MANAGE,
 }
 
 
@@ -84,6 +93,10 @@ DEFAULT_ROLES: list[tuple[str, str, bool, list[str]]] = [
             BLACKLIST_MANAGE,
             COUPON_MANAGE,
             BREAKFAST_MANAGE,
+            BILLING_MANAGE,
+            AR_MANAGE,
+            MEMBER_MANAGE,
+            SHIFT_MANAGE,
         ],
     ),
     (
@@ -101,6 +114,9 @@ DEFAULT_ROLES: list[tuple[str, str, bool, list[str]]] = [
             # 黑名单属敏感数据：前台无 blacklist.manage；券与早餐券前台可用
             COUPON_MANAGE,
             BREAKFAST_MANAGE,
+            # M1-A3：收银基础操作（建单/挂账/收款/结账）前台必做，故授予 billing.manage；
+            # 但不含 ar.manage（应收）、member.manage（会员充值）、shift.manage（交班）
+            BILLING_MANAGE,
         ],
     ),
 ]

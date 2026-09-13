@@ -1,9 +1,9 @@
 {
-  "generated_at": "2026-09-13T08:05:53+00:00",
+  "generated_at": "2026-09-13T09:50:25+00:00",
   "total_routes": 242,
-  "protected_count": 73,
-  "unprotected_count": 169,
-  "unprotected_writes_count": 84,
+  "protected_count": 88,
+  "unprotected_count": 154,
+  "unprotected_writes_count": 69,
   "unprotected_reads_count": 85,
   "items": [
     {
@@ -195,7 +195,7 @@
     {
       "method": "POST",
       "path": "/api/v1/tenants/{tenant_id}/ar-accounts",
-      "has_perm": false,
+      "has_perm": true,
       "is_write": true
     },
     {
@@ -207,13 +207,13 @@
     {
       "method": "POST",
       "path": "/api/v1/tenants/{tenant_id}/ar-accounts/{account_id}/charge",
-      "has_perm": false,
+      "has_perm": true,
       "is_write": true
     },
     {
       "method": "POST",
       "path": "/api/v1/tenants/{tenant_id}/ar-accounts/{account_id}/repayments",
-      "has_perm": false,
+      "has_perm": true,
       "is_write": true
     },
     {
@@ -255,7 +255,7 @@
     {
       "method": "POST",
       "path": "/api/v1/tenants/{tenant_id}/bills",
-      "has_perm": false,
+      "has_perm": true,
       "is_write": true
     },
     {
@@ -273,13 +273,13 @@
     {
       "method": "POST",
       "path": "/api/v1/tenants/{tenant_id}/bills/{bill_id}/apply-prepay",
-      "has_perm": false,
+      "has_perm": true,
       "is_write": true
     },
     {
       "method": "POST",
       "path": "/api/v1/tenants/{tenant_id}/bills/{bill_id}/charges",
-      "has_perm": false,
+      "has_perm": true,
       "is_write": true
     },
     {
@@ -291,13 +291,13 @@
     {
       "method": "POST",
       "path": "/api/v1/tenants/{tenant_id}/bills/{bill_id}/pay-points",
-      "has_perm": false,
+      "has_perm": true,
       "is_write": true
     },
     {
       "method": "POST",
       "path": "/api/v1/tenants/{tenant_id}/bills/{bill_id}/payments",
-      "has_perm": false,
+      "has_perm": true,
       "is_write": true
     },
     {
@@ -309,7 +309,7 @@
     {
       "method": "POST",
       "path": "/api/v1/tenants/{tenant_id}/bills/{bill_id}/settle",
-      "has_perm": false,
+      "has_perm": true,
       "is_write": true
     },
     {
@@ -909,7 +909,7 @@
     {
       "method": "POST",
       "path": "/api/v1/tenants/{tenant_id}/members",
-      "has_perm": false,
+      "has_perm": true,
       "is_write": true
     },
     {
@@ -921,7 +921,7 @@
     {
       "method": "POST",
       "path": "/api/v1/tenants/{tenant_id}/members/{phone}/recharge",
-      "has_perm": false,
+      "has_perm": true,
       "is_write": true
     },
     {
@@ -1173,7 +1173,7 @@
     {
       "method": "POST",
       "path": "/api/v1/tenants/{tenant_id}/pay-orders/{out_trade_no}/close",
-      "has_perm": false,
+      "has_perm": true,
       "is_write": true
     },
     {
@@ -1185,7 +1185,7 @@
     {
       "method": "POST",
       "path": "/api/v1/tenants/{tenant_id}/pay/reconcile",
-      "has_perm": false,
+      "has_perm": true,
       "is_write": true
     },
     {
@@ -1359,13 +1359,13 @@
     {
       "method": "POST",
       "path": "/api/v1/tenants/{tenant_id}/shifts/open",
-      "has_perm": false,
+      "has_perm": true,
       "is_write": true
     },
     {
       "method": "POST",
       "path": "/api/v1/tenants/{tenant_id}/shifts/{shift_id}/close",
-      "has_perm": false,
+      "has_perm": true,
       "is_write": true
     },
     {
