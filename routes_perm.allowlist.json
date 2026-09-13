@@ -1,9 +1,9 @@
 {
-  "generated_at": "2026-09-13T09:50:25+00:00",
+  "generated_at": "2026-09-13T13:06:52+00:00",
   "total_routes": 242,
-  "protected_count": 88,
-  "unprotected_count": 154,
-  "unprotected_writes_count": 69,
+  "protected_count": 109,
+  "unprotected_count": 133,
+  "unprotected_writes_count": 48,
   "unprotected_reads_count": 85,
   "items": [
     {
@@ -345,25 +345,25 @@
     {
       "method": "POST",
       "path": "/api/v1/tenants/{tenant_id}/bookings",
-      "has_perm": false,
+      "has_perm": true,
       "is_write": true
     },
     {
       "method": "POST",
       "path": "/api/v1/tenants/{tenant_id}/bookings/link",
-      "has_perm": false,
+      "has_perm": true,
       "is_write": true
     },
     {
       "method": "POST",
       "path": "/api/v1/tenants/{tenant_id}/bookings/settle-to-master",
-      "has_perm": false,
+      "has_perm": true,
       "is_write": true
     },
     {
       "method": "POST",
       "path": "/api/v1/tenants/{tenant_id}/bookings/unlink",
-      "has_perm": false,
+      "has_perm": true,
       "is_write": true
     },
     {
@@ -375,19 +375,19 @@
     {
       "method": "POST",
       "path": "/api/v1/tenants/{tenant_id}/bookings/{booking_id}/change-room",
-      "has_perm": false,
+      "has_perm": true,
       "is_write": true
     },
     {
       "method": "POST",
       "path": "/api/v1/tenants/{tenant_id}/bookings/{booking_id}/check-in",
-      "has_perm": false,
+      "has_perm": true,
       "is_write": true
     },
     {
       "method": "POST",
       "path": "/api/v1/tenants/{tenant_id}/bookings/{booking_id}/check-out",
-      "has_perm": false,
+      "has_perm": true,
       "is_write": true
     },
     {
@@ -399,13 +399,13 @@
     {
       "method": "POST",
       "path": "/api/v1/tenants/{tenant_id}/bookings/{booking_id}/extend-stay",
-      "has_perm": false,
+      "has_perm": true,
       "is_write": true
     },
     {
       "method": "POST",
       "path": "/api/v1/tenants/{tenant_id}/bookings/{booking_id}/extras",
-      "has_perm": false,
+      "has_perm": true,
       "is_write": true
     },
     {
@@ -465,7 +465,7 @@
     {
       "method": "POST",
       "path": "/api/v1/tenants/{tenant_id}/channels/{channel}/availability-push",
-      "has_perm": false,
+      "has_perm": true,
       "is_write": true
     },
     {
@@ -723,7 +723,7 @@
     {
       "method": "POST",
       "path": "/api/v1/tenants/{tenant_id}/group-blocks",
-      "has_perm": false,
+      "has_perm": true,
       "is_write": true
     },
     {
@@ -735,25 +735,25 @@
     {
       "method": "POST",
       "path": "/api/v1/tenants/{tenant_id}/group-blocks/{block_id}/allocations/{alloc_id}/settle",
-      "has_perm": false,
+      "has_perm": true,
       "is_write": true
     },
     {
       "method": "POST",
       "path": "/api/v1/tenants/{tenant_id}/group-blocks/{block_id}/assign",
-      "has_perm": false,
+      "has_perm": true,
       "is_write": true
     },
     {
       "method": "POST",
       "path": "/api/v1/tenants/{tenant_id}/group-blocks/{block_id}/check-in",
-      "has_perm": false,
+      "has_perm": true,
       "is_write": true
     },
     {
       "method": "POST",
       "path": "/api/v1/tenants/{tenant_id}/group-blocks/{block_id}/close",
-      "has_perm": false,
+      "has_perm": true,
       "is_write": true
     },
     {
@@ -1101,7 +1101,7 @@
     {
       "method": "PUT",
       "path": "/api/v1/tenants/{tenant_id}/ota/configs",
-      "has_perm": false,
+      "has_perm": true,
       "is_write": true
     },
     {
@@ -1149,7 +1149,7 @@
     {
       "method": "POST",
       "path": "/api/v1/tenants/{tenant_id}/ota/{channel}/inventory/push",
-      "has_perm": false,
+      "has_perm": true,
       "is_write": true
     },
     {
@@ -1197,13 +1197,13 @@
     {
       "method": "POST",
       "path": "/api/v1/tenants/{tenant_id}/price-calendar",
-      "has_perm": false,
+      "has_perm": true,
       "is_write": true
     },
     {
       "method": "POST",
       "path": "/api/v1/tenants/{tenant_id}/price-calendar/batch",
-      "has_perm": false,
+      "has_perm": true,
       "is_write": true
     },
     {
@@ -1239,13 +1239,13 @@
     {
       "method": "POST",
       "path": "/api/v1/tenants/{tenant_id}/reception/advance",
-      "has_perm": false,
+      "has_perm": true,
       "is_write": true
     },
     {
       "method": "POST",
       "path": "/api/v1/tenants/{tenant_id}/reception/check-in",
-      "has_perm": false,
+      "has_perm": true,
       "is_write": true
     },
     {

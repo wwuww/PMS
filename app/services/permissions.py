@@ -36,6 +36,8 @@ BILLING_MANAGE = "billing.manage"      # 建单/挂账/收款/结账/预付冲�
 AR_MANAGE = "ar.manage"                # 应收账户 建/挂账/回款（仅管理员 + 门店经理）
 MEMBER_MANAGE = "member.manage"        # 会员 建档/充值（充值=现金入金，双码 AND billing.manage）
 SHIFT_MANAGE = "shift.manage"          # 开班/交班（仅管理员 + 门店经理）
+# M1-B 库存价格：预订/入住/换房/续住/团队（与 BOOKING_CANCEL 正交：能登记 ≠ 能取消）
+BOOKING_MANAGE = "booking.manage"      # 预订建单/关联/换房/续住/加项/入离/团队块管理/前台高级操作
 
 ALL_PERMISSIONS = {
     PRICE_EDIT,
@@ -60,6 +62,7 @@ ALL_PERMISSIONS = {
     AR_MANAGE,
     MEMBER_MANAGE,
     SHIFT_MANAGE,
+    BOOKING_MANAGE,
 }
 
 
@@ -97,6 +100,7 @@ DEFAULT_ROLES: list[tuple[str, str, bool, list[str]]] = [
             AR_MANAGE,
             MEMBER_MANAGE,
             SHIFT_MANAGE,
+            BOOKING_MANAGE,
         ],
     ),
     (
@@ -117,6 +121,9 @@ DEFAULT_ROLES: list[tuple[str, str, bool, list[str]]] = [
             # M1-A3：收银基础操作（建单/挂账/收款/结账）前台必做，故授予 billing.manage；
             # 但不含 ar.manage（应收）、member.manage（会员充值）、shift.manage（交班）
             BILLING_MANAGE,
+            # M1-B：前台要办入住/换房/续住/加项/团队登记，故授予 booking.manage；
+            # 但不含 booking.cancel（已在原有 BOOKING_CANCEL，单独守门）、bills 敏感账务
+            BOOKING_MANAGE,
         ],
     ),
 ]

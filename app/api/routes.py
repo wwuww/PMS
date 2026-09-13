@@ -344,6 +344,7 @@ from app.services.permissions import (
     AR_MANAGE,
     MEMBER_MANAGE,
     SHIFT_MANAGE,
+    BOOKING_MANAGE,
 )
 from app.services.pay_service import (
     PayNotifySignatureError,
@@ -951,6 +952,7 @@ async def list_rate_codes(
     "/tenants/{tenant_id}/price-calendar",
     response_model=PriceCalendarOut,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Security(require_perm, scopes=[PRICE_EDIT])],
 )
 async def upsert_price_calendar(
     tenant_id: str, body: PriceCalendarCreate, session: AsyncSession = Depends(get_session)
@@ -1044,6 +1046,7 @@ async def list_price_calendar(
     "/tenants/{tenant_id}/price-calendar/batch",
     response_model=dict,
     status_code=status.HTTP_200_OK,
+    dependencies=[Security(require_perm, scopes=[PRICE_EDIT])],
 )
 async def batch_upsert_price_calendar(
     tenant_id: str,
@@ -1127,6 +1130,7 @@ async def room_type_availability(
     "/tenants/{tenant_id}/bookings",
     response_model=BookingOut,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Security(require_perm, scopes=[BOOKING_MANAGE])],
 )
 async def create_booking(
     tenant_id: str, body: BookingCreate, session: AsyncSession = Depends(get_session)
@@ -1184,7 +1188,7 @@ async def list_bookings(
     return list(result.scalars())
 
 
-@router.post("/tenants/{tenant_id}/bookings/link", response_model=list[BookingOut])
+@router.post("/tenants/{tenant_id}/bookings/link", response_model=list[BookingOut], dependencies=[Security(require_perm, scopes=[BOOKING_MANAGE])])
 async def link_bookings(
     tenant_id: str,
     body: BookingLinkIn,
@@ -1200,7 +1204,7 @@ async def link_bookings(
     return out
 
 
-@router.post("/tenants/{tenant_id}/bookings/unlink", response_model=list[BookingOut])
+@router.post("/tenants/{tenant_id}/bookings/unlink", response_model=list[BookingOut], dependencies=[Security(require_perm, scopes=[BOOKING_MANAGE])])
 async def unlink_bookings(
     tenant_id: str,
     body: BookingUnlinkIn,
@@ -1216,7 +1220,7 @@ async def unlink_bookings(
     return out
 
 
-@router.post("/tenants/{tenant_id}/bookings/settle-to-master")
+@router.post("/tenants/{tenant_id}/bookings/settle-to-master", dependencies=[Security(require_perm, scopes=[BOOKING_MANAGE])])
 async def settle_booking_to_master(
     tenant_id: str,
     body: BookingSettleToMasterIn,
@@ -1232,7 +1236,7 @@ async def settle_booking_to_master(
     return out
 
 
-@router.post("/tenants/{tenant_id}/bookings/{booking_id}/check-in", response_model=BookingOut)
+@router.post("/tenants/{tenant_id}/bookings/{booking_id}/check-in", response_model=BookingOut, dependencies=[Security(require_perm, scopes=[BOOKING_MANAGE])])
 async def booking_check_in(
     tenant_id: str,
     booking_id: int,
@@ -1254,7 +1258,7 @@ async def booking_check_in(
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
 
 
-@router.post("/tenants/{tenant_id}/bookings/{booking_id}/check-out", response_model=BookingOut)
+@router.post("/tenants/{tenant_id}/bookings/{booking_id}/check-out", response_model=BookingOut, dependencies=[Security(require_perm, scopes=[BOOKING_MANAGE])])
 async def booking_check_out(
     tenant_id: str,
     booking_id: int,
@@ -1274,7 +1278,7 @@ async def booking_check_out(
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
 
 
-@router.post("/tenants/{tenant_id}/bookings/{booking_id}/extend-stay", response_model=BookingOut)
+@router.post("/tenants/{tenant_id}/bookings/{booking_id}/extend-stay", response_model=BookingOut, dependencies=[Security(require_perm, scopes=[BOOKING_MANAGE])])
 async def booking_extend_stay(
     tenant_id: str,
     booking_id: int,
@@ -1292,7 +1296,7 @@ async def booking_extend_stay(
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
 
 
-@router.post("/tenants/{tenant_id}/bookings/{booking_id}/change-room", response_model=BookingOut)
+@router.post("/tenants/{tenant_id}/bookings/{booking_id}/change-room", response_model=BookingOut, dependencies=[Security(require_perm, scopes=[BOOKING_MANAGE])])
 async def booking_change_room(
     tenant_id: str,
     booking_id: int,
@@ -1317,6 +1321,7 @@ async def booking_change_room(
 @router.post(
     "/tenants/{tenant_id}/bookings/{booking_id}/extras",
     response_model=BookingOut,
+    dependencies=[Security(require_perm, scopes=[BOOKING_MANAGE])],
 )
 async def booking_update_extras(
     tenant_id: str,
@@ -1343,6 +1348,7 @@ async def booking_update_extras(
 @router.post(
     "/tenants/{tenant_id}/reception/check-in",
     response_model=BookingOut,
+    dependencies=[Security(require_perm, scopes=[BOOKING_MANAGE])],
 )
 async def reception_check_in(
     tenant_id: str,
@@ -1443,6 +1449,7 @@ async def reception_context(
 @router.post(
     "/tenants/{tenant_id}/reception/advance",
     response_model=ReceptionContext,
+    dependencies=[Security(require_perm, scopes=[BOOKING_MANAGE])],
 )
 async def reception_advance(
     tenant_id: str,
@@ -1501,6 +1508,7 @@ async def _group_block_out(session: AsyncSession, block: GroupBlock) -> GroupBlo
     "/tenants/{tenant_id}/group-blocks",
     response_model=GroupBlockOut,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Security(require_perm, scopes=[BOOKING_MANAGE])],
 )
 async def create_group_block(
     tenant_id: str, body: GroupBlockCreate, session: AsyncSession = Depends(get_session)
@@ -1545,7 +1553,7 @@ async def get_group_block(
     return await _group_block_out(session, block)
 
 
-@router.post("/tenants/{tenant_id}/group-blocks/{block_id}/assign", response_model=GroupBlockOut)
+@router.post("/tenants/{tenant_id}/group-blocks/{block_id}/assign", response_model=GroupBlockOut, dependencies=[Security(require_perm, scopes=[BOOKING_MANAGE])])
 async def assign_group_block_rooms(
     tenant_id: str,
     block_id: int,
@@ -1565,7 +1573,7 @@ async def assign_group_block_rooms(
     return await _group_block_out(session, block)
 
 
-@router.post("/tenants/{tenant_id}/group-blocks/{block_id}/check-in", response_model=GroupBlockOut)
+@router.post("/tenants/{tenant_id}/group-blocks/{block_id}/check-in", response_model=GroupBlockOut, dependencies=[Security(require_perm, scopes=[BOOKING_MANAGE])])
 async def check_in_group_block(
     tenant_id: str,
     block_id: int,
@@ -1585,7 +1593,7 @@ async def check_in_group_block(
     return await _group_block_out(session, block)
 
 
-@router.post("/tenants/{tenant_id}/group-blocks/{block_id}/close", response_model=GroupBlockOut)
+@router.post("/tenants/{tenant_id}/group-blocks/{block_id}/close", response_model=GroupBlockOut, dependencies=[Security(require_perm, scopes=[BOOKING_MANAGE, BILLING_MANAGE])])
 async def close_group_block(
     tenant_id: str, block_id: int, session: AsyncSession = Depends(get_session)
 ) -> GroupBlockOut:
@@ -1670,6 +1678,7 @@ async def booking_mark_noshow(
 @router.post(
     "/tenants/{tenant_id}/channels/{channel}/availability-push",
     response_model=ChannelResultOut,
+    dependencies=[Security(require_perm, scopes=[OTA_MANAGE])],
 )
 async def channel_availability_push(
     tenant_id: str,
@@ -4808,7 +4817,7 @@ async def list_ota_configs(
     return await OtaService(session).list_configs(tenant_id)
 
 
-@router.put("/tenants/{tenant_id}/ota/configs", response_model=OtaConfigOut)
+@router.put("/tenants/{tenant_id}/ota/configs", response_model=OtaConfigOut, dependencies=[Security(require_perm, scopes=[OTA_MANAGE])])
 async def upsert_ota_config(
     tenant_id: str,
     body: OtaConfigIn,
@@ -4869,7 +4878,7 @@ async def ota_webhook_order(
     }
 
 
-@router.post("/tenants/{tenant_id}/ota/{channel}/inventory/push")
+@router.post("/tenants/{tenant_id}/ota/{channel}/inventory/push", dependencies=[Security(require_perm, scopes=[OTA_MANAGE])])
 async def ota_push_inventory(
     tenant_id: str,
     channel: str,
@@ -5116,7 +5125,8 @@ async def pay_bill_with_points(
 
 
 @router.post(
-    "/tenants/{tenant_id}/group-blocks/{block_id}/allocations/{alloc_id}/settle"
+    "/tenants/{tenant_id}/group-blocks/{block_id}/allocations/{alloc_id}/settle",
+    dependencies=[Security(require_perm, scopes=[BOOKING_MANAGE, BILLING_MANAGE])],
 )
 async def settle_group_allocation(
     tenant_id: str,

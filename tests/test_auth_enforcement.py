@@ -35,6 +35,12 @@ def _seed(client: TestClient, code: str = "authz") -> dict:
         json={"code": "STD", "name": "标间", "base_price": 30000},
         headers=auth,
     ).json()
+    # 必须建物理房间，否则 bookings 建单会 409「房量不足」
+    client.post(
+        f"/api/v1/hotels/{h['id']}/rooms",
+        json=[{"room_type_id": rt["id"], "room_no": "0101"}],
+        headers=auth,
+    )
     return {"t": t, "token": token, "auth": auth, "h": h, "rt": rt}
 
 
@@ -71,12 +77,15 @@ class TestAuthenticationLayer:
 
 class TestHotelPathTenantResolution:
     def test_hotel_scoped_room_create_works_with_token(self, client: TestClient) -> None:
-        """回归：/hotels/{hotel_id}/rooms 需按门店反查租户，带 token 应可用。"""
+        """回归：/hotels/{hotel_id}/rooms 需按门店反查租户，带 token 应可用。
+
+        注：_seed 已自动建 0101 房间，故此用例建第二间 0102。
+        """
         d = _seed(client, "authz5")
         hotel_id = d["h"]["id"]
         r = client.post(
             f"/api/v1/hotels/{hotel_id}/rooms",
-            json=[{"room_type_id": d["rt"]["id"], "room_no": "0101"}],
+            json=[{"room_type_id": d["rt"]["id"], "room_no": "0102"}],
             headers=d["auth"],
         )
         assert r.status_code == 201, r.text
@@ -476,4 +485,225 @@ class TestA3BillingPermission:
             headers=d["auth"],
         )
         assert r.status_code in (200, 201), r.text
+
+
+class TestB1BookingPermission:
+    """M1-B：库存价格 + 预订/入住/团队路由挂码验证。
+
+    行动清单：B 桶（库存价格）21 条挂码 —— 价格日历（``price.edit``）、
+    OTA 推送/渠道（``ota.manage``）、预订建单/换房/续住/加项/入离/
+    团队块管理（``booking.manage``，前台应能用）、团队 close 触账
+    （``[BOOKING_MANAGE, BILLING_MANAGE]`` 双码 AND）。
+
+    正交点：
+    - 前台有 BOOKING_MANAGE（能办入住）但**无 BOOKING_CANCEL**（不能取消单）—— 验"能登记≠能取消"
+    - 前台有 BOOKING_MANAGE + BILLING_MANAGE（前台结账权）→ 团队 close 仍可触发
+    - 前台无 PRICE_EDIT / OTA_MANAGE → 改价 / OTA 推送 403
+    """
+
+    def _front_token(self, client: TestClient, code: str, d: dict) -> str:
+        u = client.post(
+            f"/api/v1/tenants/{code}/users",
+            json={"username": "front_b", "password": "pw123456"},
+            headers=d["auth"],
+        ).json()
+        roles = client.get(f"/api/v1/tenants/{code}/roles", headers=d["auth"]).json()
+        front = next(r for r in roles if r["name"] == "前台")
+        client.post(
+            f"/api/v1/tenants/{code}/users/{u['id']}/roles",
+            json={"role_id": front["id"], "hotel_id": d["h"]["id"]},
+            headers=d["auth"],
+        )
+        return client.post(
+            f"/api/v1/tenants/{code}/auth/login",
+            json={"username": "front_b", "password": "pw123456"},
+        ).json()["token"]
+
+    def test_front_can_create_booking(self, client: TestClient) -> None:
+        """前台有 booking.manage → 预订建单 201（确认前台登记路径不被打死）。"""
+        d = _seed(client, "b1book1")
+        token = self._front_token(client, "b1book1", d)
+        r = client.post(
+            "/api/v1/tenants/b1book1/bookings",
+            json={
+                "hotel_id": d["h"]["id"],
+                "room_type_id": d["rt"]["id"],
+                "guest_name": "前台登记",
+                "check_in_date": "2026-09-13",
+                "check_out_date": "2026-09-14",
+                "stay_type": "daily",
+            },
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code in (200, 201), r.text
+
+    def test_front_can_check_in(self, client: TestClient) -> None:
+        """前台有 booking.manage → 入住 200（核心前台路径必须可用）。"""
+        d = _seed(client, "b1book2")
+        token = self._front_token(client, "b1book2", d)
+        # 后台建单并预分配房号（避免前台先被 booking.manage 拦住）
+        b = client.post(
+            "/api/v1/tenants/b1book2/bookings",
+            json={
+                "hotel_id": d["h"]["id"],
+                "room_type_id": d["rt"]["id"],
+                "guest_name": "入住测试",
+                "check_in_date": "2026-09-13",
+                "check_out_date": "2026-09-14",
+                "stay_type": "daily",
+                "room_no": "0101",
+            },
+            headers=d["auth"],
+        ).json()
+        r = client.post(
+            f"/api/v1/tenants/b1book2/bookings/{b['id']}/check-in",
+            json={"action": "check_in", "operator": "front_b", "room_no": "0101"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code in (200, 201), r.text
+
+    def test_front_cannot_change_price_calendar(self, client: TestClient) -> None:
+        """前台无 price.edit → 改价日历 403（防前台绕审批擅自改价）。"""
+        d = _seed(client, "b1price1")
+        token = self._front_token(client, "b1price1", d)
+        r = client.post(
+            "/api/v1/tenants/b1price1/price-calendar",
+            json={
+                "room_type_id": d["rt"]["id"],
+                "date": "2026-09-13",
+                "price": 99900,
+            },
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 403
+        assert "price.edit" in r.json()["detail"]
+
+    def test_front_cannot_change_price_calendar_batch(self, client: TestClient) -> None:
+        """前台无 price.edit → 批量改价 403（防 batch 绕过单条门控）。"""
+        d = _seed(client, "b1price2")
+        token = self._front_token(client, "b1price2", d)
+        r = client.post(
+            "/api/v1/tenants/b1price2/price-calendar/batch",
+            json=[
+                {
+                    "room_type_id": d["rt"]["id"],
+                    "date": "2026-09-13",
+                    "price": 99900,
+                }
+            ],
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 403
+        assert "price.edit" in r.json()["detail"]
+
+    def test_front_cannot_ota_push_inventory(self, client: TestClient) -> None:
+        """前台无 ota.manage → OTA 库存推送 403（防前台误推 OTA 房价/房量）。"""
+        d = _seed(client, "b1ota1")
+        token = self._front_token(client, "b1ota1", d)
+        r = client.post(
+            "/api/v1/tenants/b1ota1/ota/CTRIP/inventory/push",
+            json={"room_type_id": d["rt"]["id"]},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 403
+        assert "ota.manage" in r.json()["detail"]
+
+    def test_front_cannot_update_ota_config(self, client: TestClient) -> None:
+        """前台无 ota.manage → OTA 渠道配置 403（防前台改渠道 key）。"""
+        d = _seed(client, "b1ota2")
+        token = self._front_token(client, "b1ota2", d)
+        r = client.put(
+            "/api/v1/tenants/b1ota2/ota/configs",
+            json={"channel": "CTRIP", "enabled": True, "credentials": {"x": "1"}},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 403
+        assert "ota.manage" in r.json()["detail"]
+
+    def test_front_can_extend_stay(self, client: TestClient) -> None:
+        """前台有 booking.manage → 续住 200（前台高频操作不应被打死）。
+
+        业务规则：续住要求 CHECKED_IN 状态 → 先入住再续住（都用前台 token）。
+        """
+        d = _seed(client, "b1book3")
+        token = self._front_token(client, "b1book3", d)
+        b = client.post(
+            "/api/v1/tenants/b1book3/bookings",
+            json={
+                "hotel_id": d["h"]["id"],
+                "room_type_id": d["rt"]["id"],
+                "guest_name": "续住测试",
+                "check_in_date": "2026-09-13",
+                "check_out_date": "2026-09-14",
+                "stay_type": "daily",
+                "room_no": "0101",
+            },
+            headers=d["auth"],
+        ).json()
+        # 前台先入住（booking.manage 已含此权）
+        ci = client.post(
+            f"/api/v1/tenants/b1book3/bookings/{b['id']}/check-in",
+            json={"action": "check_in", "operator": "front_b", "room_no": "0101"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert ci.status_code in (200, 201), ci.text
+        # 再续住
+        r = client.post(
+            f"/api/v1/tenants/b1book3/bookings/{b['id']}/extend-stay",
+            json={"new_check_out_date": "2026-09-15"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code in (200, 201), r.text
+
+    def test_front_cannot_change_room(self, client: TestClient) -> None:
+        """前台有 booking.manage 但换房涉及房态/库存：仍允许（前台操作必能）。
+
+        文档与 PRD 一致：booking.manage 含换房权；不允许前台单独再卡一道。
+        """
+        d = _seed(client, "b1book4")
+        token = self._front_token(client, "b1book4", d)
+        b = client.post(
+            "/api/v1/tenants/b1book4/bookings",
+            json={
+                "hotel_id": d["h"]["id"],
+                "room_type_id": d["rt"]["id"],
+                "guest_name": "换房测试",
+                "check_in_date": "2026-09-13",
+                "check_out_date": "2026-09-14",
+                "stay_type": "daily",
+            },
+            headers=d["auth"],
+        ).json()
+        r = client.post(
+            f"/api/v1/tenants/b1book4/bookings/{b['id']}/change-room",
+            json={"new_room_id": None},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        # 不要求 200（房间未实际分配会 400），但**不应 403**
+        assert r.status_code != 403, r.text
+
+    def test_admin_can_update_price_calendar(self, client: TestClient) -> None:
+        """管理员持有 price.edit → 改价日历 200（确认未误伤）。"""
+        d = _seed(client, "b1price3")
+        r = client.post(
+            "/api/v1/tenants/b1price3/price-calendar",
+            json={
+                "room_type_id": d["rt"]["id"],
+                "date": "2026-09-13",
+                "price": 99000,
+            },
+            headers=d["auth"],
+        )
+        assert r.status_code in (200, 201), r.text
+
+    def test_admin_can_ota_push(self, client: TestClient) -> None:
+        """管理员持有 ota.manage → OTA 库存推送 200（确认未误伤）。"""
+        d = _seed(client, "b1ota3")
+        r = client.post(
+            "/api/v1/tenants/b1ota3/ota/CTRIP/inventory/push",
+            json={"room_type_id": d["rt"]["id"]},
+            headers=d["auth"],
+        )
+        # 不在意内部推送成功（可能有 mocking 限制），只要不是 403
+        assert r.status_code != 403, r.text
 
