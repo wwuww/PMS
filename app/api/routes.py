@@ -2531,6 +2531,7 @@ async def assign_user_role(
 @router.get(
     "/tenants/{tenant_id}/users/{user_id}/roles",
     response_model=list[UserRoleOut],
+    dependencies=[Security(require_perm, scopes=[USER_MANAGE])],
 )
 async def list_user_roles(
     tenant_id: str,

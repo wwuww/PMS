@@ -1,10 +1,10 @@
 {
-  "generated_at": "2026-09-13T07:38:04+00:00",
+  "generated_at": "2026-09-13T08:05:53+00:00",
   "total_routes": 242,
-  "protected_count": 72,
-  "unprotected_count": 170,
+  "protected_count": 73,
+  "unprotected_count": 169,
   "unprotected_writes_count": 84,
-  "unprotected_reads_count": 86,
+  "unprotected_reads_count": 85,
   "items": [
     {
       "method": "POST",
@@ -1389,7 +1389,7 @@
     {
       "method": "GET",
       "path": "/api/v1/tenants/{tenant_id}/users/{user_id}/roles",
-      "has_perm": false,
+      "has_perm": true,
       "is_write": false
     },
     {

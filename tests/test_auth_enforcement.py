@@ -290,6 +290,21 @@ class TestReversePrivilegeOnUserRoleList:
         assert len(ru.json()) >= 1
         assert any(r["name"] == "管理员" for r in rr.json())
 
+    def test_staff_denied_on_user_roles_binding(self, client: TestClient) -> None:
+        """残留同类：读「某用户的角色绑定」也是隐私读，前台 → 403。
+
+        （数析报告 routes.py:2531 发现的漏网之鱼，与 /users、/roles 同类。）
+        """
+        d = _seed(client, "rev5")
+        token = self._front_token(client, "rev5", d)
+        target = client.get("/api/v1/tenants/rev5/users", headers=d["auth"]).json()[0]
+        r = client.get(
+            f"/api/v1/tenants/rev5/users/{target['id']}/roles",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 403
+        assert "user.manage" in r.json()["detail"]
+
     def test_anonymous_denied_on_user_list(self, client: TestClient) -> None:
         """未登录 → 401（认证层先于授权层拦截）。"""
         _seed(client, "rev4")
